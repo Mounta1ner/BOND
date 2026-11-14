@@ -20,6 +20,13 @@
 
   S.ui = S.ui || {};
   S.ui.v3HeatmapWeeks = S.ui.v3HeatmapWeeks || 26;
+  // Standardmäßig beim App-Start eingeklappt (false)
+  if (typeof S.ui.v3ExercisesOpen !== 'boolean') S.ui.v3ExercisesOpen = false;
+
+  const EXTRA_HISTORY_LABELS = {
+    heatmap: 'Aktivitäts-Heatmap (26/52 Wochen)',
+    strengthChart: 'Kraft- & Leistungsverlauf'
+  };
 
   function shiftDate(dateStr, deltaDays) {
     const d = new Date(dateStr + 'T12:00:00');
@@ -32,13 +39,11 @@
     return DAYS[wd(d)] + ', ' + d.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit' });
   }
 
-  // Synchronisiert aktive Pausentage dauerhaft in S.pauseMode.pausedDates
   function syncPauseModeDates() {
     const now = iso();
     if (!S.pauseMode.active) return;
 
     if (S.pauseMode.until && now > S.pauseMode.until) {
-      // Zeitraum abgelaufen -> automatisch beenden, historische Tage bleiben in pausedDates geschützt
       S.pauseMode.active = false;
       save();
       return;
@@ -86,7 +91,6 @@
     return (S.jokers.usedDates || []).includes(dateStr) || window.v3IsDatePaused(dateStr);
   };
 
-  // Prüft für ein Datum d, welche festen Pläne und Aktivitäten fällig und erledigt waren
   function getDayCompletionInfo(d) {
     const dtObj = new Date(d + 'T12:00:00');
     const weekday = wd(dtObj);
@@ -120,7 +124,6 @@
     };
   }
 
-  // Sucht in den letzten 7 Tagen (ab gestern rückwärts) nach offenen Pflichttagen
   function getRecentEndangeredDays(daysBack = 7) {
     const todayStr = iso();
     const list = [];
@@ -150,7 +153,6 @@
     S.jokers.usedDates.push(dateStr);
     S.jokers.usedDates.sort();
 
-    // Falls Make me feel it für diesen Tag bereits eine Miss-Buchung erzeugt hat, wieder gutschreiben
     if (Array.isArray(S.financeLedger)) {
       S.financeLedger = S.financeLedger.filter(entry => !(entry.type === 'miss' && String(entry.id).endsWith(':' + dateStr)));
     }
@@ -161,7 +163,7 @@
     render();
   };
 
-  // --- 4. EINSATZ 2: VERPASSTE AKTIVITÄT NACHBUCHEN (INKL. GESTERN-SCHNELLBUTTON) ---
+  // --- 4. EINSATZ 2: VERPASSTE AKTIVITÄT NACHBUCHEN ---
   window.v3BackfillHabit = function (habitId, dateStr, useJoker = true) {
     const h = S.habits.find(x => x.id === habitId);
     if (!h || !dateStr) return;
@@ -183,7 +185,6 @@
       h.missedCount = Math.max(0, h.missedCount - 1);
     }
 
-    // Event mit Zeitstempel des gewählten Tages in S.activityEvents eintragen
     const eventTime = dateStr + 'T12:00:00.000Z';
     const uid = 'backfill-' + dateStr + '-' + habitId + '-' + Date.now();
     if (typeof addActivityEvent === 'function') {
@@ -193,7 +194,6 @@
       S.activityEvents.push({ id: uid, habitId, name: h.name, type: 'done', at: eventTime, source: 'joker' });
     }
 
-    // Etwaige Miss-Strafbuchung für diese Aktivität an diesem Tag aus dem Ledger entfernen
     if (Array.isArray(S.financeLedger)) {
       const missId = 'miss:h:' + habitId + ':' + dateStr;
       S.financeLedger = S.financeLedger.filter(e => e.id !== missId);
@@ -258,7 +258,7 @@
     `, false);
   };
 
-  // --- 5. PAUSIER-MODUS (KRANKHEIT / URLAUB) IN EINSTELLUNGEN ---
+  // --- 5. PAUSIER-MODUS (KRANKHEIT / URLAUB) ---
   window.v3TogglePauseMode = function (active) {
     const reasonEl = document.getElementById('v3PauseReason');
     const untilEl = document.getElementById('v3PauseUntil');
@@ -287,8 +287,7 @@
     render();
   };
 
-  // --- 6. ÜBERSCHREIBUNG DER STREAK- & MISS-LOGIK (INKL. DASHBOARD-TILES) ---
-  // 6a. scheduledMisses (tracking-advanced.js): Geschützte Tage erzeugen keine Fehltage/Strafgebühren
+  // --- 6. ÜBERSCHREIBUNG DER STREAK- & MISS-LOGIK ---
   if (typeof scheduledMisses === 'function') {
     const _origScheduledMisses = scheduledMisses;
     scheduledMisses = function (today = iso()) {
@@ -297,7 +296,6 @@
     };
   }
 
-  // 6b. stats() (app.js): Geschützte Tage unterbrechen die Plan-Serie nicht
   if (typeof stats === 'function') {
     stats = function () {
       let total = 0;
@@ -323,7 +321,6 @@
           run++;
           best = Math.max(best, run);
         } else if (window.v3IsDateProtected(dStr) || k === 0) {
-          // Geschützter Tag oder noch offener heutiger Tag: Serie bleibt erhalten!
           continue;
         } else {
           run = 0;
@@ -333,7 +330,6 @@
     };
   }
 
-  // 6c. v27Streak(p) (v27.js): Geschützte Tage in einer Woche reduzieren das Wochensoll entsprechend
   if (typeof v27Streak === 'function') {
     v27Streak = function (p) {
       let streak = 0;
@@ -370,7 +366,6 @@
     };
   }
 
-  // 6d. Berechnet die Dashboard-Statistiken (analog dashboardStats in v282.js) unter Berücksichtigung von Jokern & Pause
   window.v3ComputeProtectedDashboardStats = function () {
     let run = 0, best = 0, miss = 0;
     const now = iso();
@@ -383,7 +378,6 @@
         run++;
         best = Math.max(best, run);
       } else if (window.v3IsDateProtected(d)) {
-        // Geschützter Tag (Joker oder Pause): zählt nicht als ausgelassen und bricht die Serie nicht!
         continue;
       } else if (i > 0) {
         miss += (info.due - info.done);
@@ -414,7 +408,7 @@
 
     const endangered = getRecentEndangeredDays(7);
     if (endangered.length > 0 && !S.pauseMode.active) {
-      const target = endangered[0]; // Jüngster verpasster Pflichttag (meistens gestern)
+      const target = endangered[0];
       const missedNames = [
         ...target.missedPlans.map(p => p.name),
         ...target.missedHabits.map(h => h.name)
@@ -490,7 +484,6 @@
       map[d] = { sets: 0, exercises: 0, habits: 0, total: 0, joker: (S.jokers.usedDates || []).includes(d), paused: window.v3IsDatePaused(d) };
     }
 
-    // 1. Erledigte Plan-Sätze aus S.log
     Object.keys(S.log || {}).forEach(d => {
       if (!map[d]) return;
       const dayLog = S.log[d] || {};
@@ -502,7 +495,6 @@
       });
     });
 
-    // 2. Einzelübungen / Favoriten aus S.exerciseHistory
     (S.exerciseHistory || []).forEach(ev => {
       if (!ev || !ev.at) return;
       const d = iso(new Date(ev.at));
@@ -511,7 +503,6 @@
       }
     });
 
-    // 3. Erledigte Aktivitäten aus S.habitLog & S.activityEvents
     Object.keys(S.habitLog || {}).forEach(d => {
       if (!map[d]) return;
       const hLog = S.habitLog[d] || {};
@@ -632,7 +623,7 @@
           </svg>
         </div>
 
-        <div class="r" style="justify-content:space-between;font-size:11px;margin-top:6px" class="mu">
+        <div class="r" style="justify-content:space-between;font-size:11px;margin-top:6px">
           <span class="mu">Kästchen antippen für Tages-Details & Nachbuchen</span>
           <span class="r" style="gap:4px;font-size:11px;color:var(--mu)">
             Weniger
@@ -646,7 +637,6 @@
       </div>`;
   };
 
-  // Erweitere d282Day(dateStr) aus v282.js, damit man auch direkt beim Klick auf ein Heatmap-Feld Joker/Nachbuchen nutzen kann
   if (typeof window.d282Day === 'function') {
     const _origD282Day = window.d282Day;
     window.d282Day = function (d) {
@@ -706,7 +696,6 @@
     const tpl = document.createElement('template');
     tpl.innerHTML = html;
 
-    // 1. Warnbanner „🃏 Serie in Gefahr!“ oder Pausier-Status oben einblenden
     const rescueHtml = renderStreakRescueBannerHtml();
     if (rescueHtml) {
       const planSec = tpl.content.querySelector('section[data-module="plans"]') || tpl.content;
@@ -715,7 +704,6 @@
       planSec.prepend(...wrap.content.children);
     }
 
-    // 2. Im Aktivitäten-Block auf Home den Button „🃏 Gestern nachbuchen“ ergänzen
     if (S.habits && S.habits.length > 0) {
       const yesterday = shiftDate(iso(), -1);
       const actHeaders = [...tpl.content.querySelectorAll('h3')].filter(h => /Aktivitäten & Routinen|Activities/i.test(h.textContent || ''));
@@ -745,7 +733,7 @@
     const tpl = document.createElement('template');
     tpl.innerHTML = html;
 
-    // 1. Aktualisiere die 3 Top-Statistik-Kacheln („Tage Serie“, „Beste Serie“, „Ausgelassen“) mit den geschützten Werten
+    // 1. Top-Statistik-Kacheln mit geschützten Werten aktualisieren
     const pStats = window.v3ComputeProtectedDashboardStats();
     const firstStatsRow = tpl.content.querySelector('.d282-stats');
     if (firstStatsRow) {
@@ -755,7 +743,7 @@
       if (tiles[2]) tiles[2].textContent = pStats.miss;
     }
 
-    // 2. Füge das „🃏 Serie in Gefahr!“-Banner im Dashboard oberhalb der Kacheln ein
+    // 2. Warnbanner oben im Dashboard einfügen
     const rescueHtml = renderStreakRescueBannerHtml();
     if (rescueHtml) {
       const h2 = tpl.content.querySelector('h2');
@@ -765,7 +753,7 @@
       else tpl.content.prepend(...wrap.content.children);
     }
 
-    // 3. Füge die 26-Wochen-Heatmap ein (sofern nicht ausgeblendet)
+    // 3. Heatmap einfügen (unter Berücksichtigung von Sichtbarkeit & Reihenfolge)
     if (!tpl.content.querySelector('[data-v3-section="heatmap"]') && S.ui.historyVisible?.heatmap !== false) {
       const hmWrap = document.createElement('template');
       hmWrap.innerHTML = window.v3HeatmapCard();
@@ -774,7 +762,20 @@
       else tpl.content.appendChild(hmWrap.content.firstElementChild);
     }
 
-    // 4. Füge in der Aktivitäten-Karte im Dashboard ebenfalls den Button „🃏 Gestern nachbuchen“ ein
+    // 4. „Absolvierte Einzelübungen“ einklappbar machen (beim Start eingeklappt)
+    const exCard = [...tpl.content.querySelectorAll('.c')].find(c => /^Absolvierte Einzelübungen/i.test(c.querySelector(':scope > h3')?.textContent?.trim() || ''));
+    if (exCard) {
+      const h3 = exCard.querySelector(':scope > h3');
+      const rows = [...exCard.querySelectorAll('.settingsRow')];
+      const count = rows.length;
+      const titleText = h3 ? h3.textContent.trim() : 'Absolvierte Einzelübungen';
+      if (h3) h3.remove();
+      const innerHtml = exCard.innerHTML;
+      const openAttr = S.ui.v3ExercisesOpen ? 'open' : '';
+      exCard.innerHTML = `<details ${openAttr} ontoggle="S.ui.v3ExercisesOpen=this.open;save()"><summary style="font-weight:700;cursor:pointer">${esc(titleText)} (${count})</summary><div style="margin-top:8px">${innerHtml}</div></details>`;
+    }
+
+    // 5. In der Aktivitäten-Karte im Dashboard „🃏 Gestern nachbuchen“ ergänzen
     const actCard = [...tpl.content.querySelectorAll('.c')].find(c => /⚡ Aktivitäten/i.test(c.querySelector('h3')?.textContent || ''));
     if (actCard && S.habits.length && !actCard.querySelector('.v3-backfill-hist-btn')) {
       const yesterday = shiftDate(iso(), -1);
@@ -796,8 +797,24 @@
     const tpl = document.createElement('template');
     tpl.innerHTML = html;
 
-    // 1. Ergänze 'heatmap' in der Dashboard-Reihung (falls v282.js nicht direkt editiert wurde)
-    if (!html.includes("d282ToggleHistory('heatmap'")) {
+    // 1. Repariere alle "undefined"-Labels in "Verlauf Reihung und Anzeige konfigurieren"
+    const historyCheckboxes = tpl.content.querySelectorAll('input[onchange^="d282ToggleHistory("]');
+    historyCheckboxes.forEach(cb => {
+      const m = (cb.getAttribute('onchange') || '').match(/^d282ToggleHistory\('([^']+)'/);
+      if (!m) return;
+      const key = m[1];
+      const lbl = cb.closest('label');
+      if (!lbl) return;
+      if (/undefined/i.test(lbl.textContent || '')) {
+        const cleanName = EXTRA_HISTORY_LABELS[key] || key;
+        lbl.innerHTML = '';
+        lbl.appendChild(cb);
+        lbl.appendChild(document.createTextNode(' ' + cleanName));
+      }
+    });
+
+    // Falls 'heatmap' noch gar nicht in der Liste stand, ergänzen
+    if (!tpl.content.querySelector('input[onchange^="d282ToggleHistory(\'heatmap\'"]')) {
       const histSummary = [...tpl.content.querySelectorAll('summary')].find(s => /Verlauf Reihung|Configure history/i.test(s.textContent || ''));
       const container = histSummary?.parentElement?.querySelector('div');
       if (container) {
@@ -805,12 +822,12 @@
         const checked = S.ui.historyVisible?.heatmap === false ? '' : 'checked';
         const row = document.createElement('div');
         row.className = 'settingsRow';
-        row.innerHTML = `<label style="flex:1"><input type="checkbox" ${checked} onchange="d282ToggleHistory('heatmap',this.checked)"> Aktivitäts-Heatmap (26/52 Wochen)</label><button class="chip" onclick="d282MoveHistory(${idx},-1)">↑</button><button class="chip" onclick="d282MoveHistory(${idx},1)">↓</button>`;
+        row.innerHTML = `<label style="flex:1"><input type="checkbox" ${checked} onchange="d282ToggleHistory('heatmap',this.checked)"> ${EXTRA_HISTORY_LABELS.heatmap}</label><button class="chip" onclick="d282MoveHistory(${idx},-1)">↑</button><button class="chip" onclick="d282MoveHistory(${idx},1)">↓</button>`;
         container.prepend(row);
       }
     }
 
-    // 2. Ergänze die Einstellungen für „🃏 Joker & Pausier-Modus (Krankheit / Urlaub)“
+    // 2. Einstellungen für „🛡️ Serien-Schutz: Joker & Pausier-Modus“ ergänzen
     const jStats = window.v3GetJokerStats();
     const pauseCard = document.createElement('div');
     pauseCard.className = 'c';
