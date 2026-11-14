@@ -72,7 +72,6 @@
 
   loadAdminOverrides();
 
-  // Default-Metadaten für bestehende Übungen ableiten
   function getExecMode(e) {
     if (!e) return 'reps';
     if (e.execMode && ['reps', 'hold', 'sequence'].includes(e.execMode)) return e.execMode;
@@ -87,14 +86,12 @@
     return DEFAULT_UNILATERAL_IDS.has(e.id);
   };
 
-  // Überschreibe unit(e), damit e.execMode ('reps' | 'hold' | 'sequence') die Einheit steuert
-  const _origUnit = unit;
-  unit = function (e) {
+  window.v3Unit = function (e) {
     if (!e) return 'Wdh.';
     if (isM(e)) return 'Min.';
     if (e.execMode === 'hold' || e.execMode === 'sequence') return 'Sek.';
     if (e.execMode === 'reps') return 'Wdh.';
-    return _origUnit(e);
+    return unit(e);
   };
 
   // --- 2. HASHTAGS IN SUCHE (v281Search) & MULTI-YOUTUBE (ytHtml) ---
@@ -239,9 +236,9 @@
 
     const coords = a.coords.map((v, i) => lerp(v, b.coords[i]));
     const hasArm2 = a.hasArm2 || b.hasArm2;
-    const arm2 = a.arm2.map((v, i) => lerp(a.hasArm2 ? v : a.coords[i < 2 ? 10 + i : 10 + i], b.hasArm2 ? b.arm2[i] : b.coords[i < 2 ? 10 + i : 10 + i]));
+    const arm2 = a.arm2.map((v, i) => lerp(a.hasArm2 ? v : a.coords[10 + i], b.hasArm2 ? b.arm2[i] : b.coords[10 + i]));
     const hasLeg2 = a.hasLeg2 || b.hasLeg2;
-    const leg2 = a.leg2.map((v, i) => lerp(a.hasLeg2 ? v : a.coords[i < 2 ? 6 + i : 6 + i], b.hasLeg2 ? b.leg2[i] : b.coords[i < 2 ? 6 + i : 6 + i]));
+    const leg2 = a.leg2.map((v, i) => lerp(a.hasLeg2 ? v : a.coords[6 + i], b.hasLeg2 ? b.leg2[i] : b.coords[6 + i]));
 
     return serializeFigData({
       coords,
@@ -262,7 +259,6 @@
     return mid ? [start, mid, end] : [start, end];
   }
 
-  // Globaler RequestAnimationFrame-Loop für alle sichtbaren Morphing-Boxen (.v3-morph-box)
   let morphRafId = 0;
   function startGlobalMorphLoop() {
     if (morphRafId) return;
@@ -282,13 +278,11 @@
         let figStr = frames[0];
         let phaseLabel = 'Start';
         if (frames.length === 2) {
-          // Ping-Pong über 2.6 Sekunden
           const cycle = (now % 2600) / 2600;
           const t = cycle < 0.5 ? cycle * 2 : (1 - cycle) * 2;
           figStr = window.v3InterpolateFig(frames[0], frames[1], t);
           phaseLabel = t < 0.25 ? 'Start' : t > 0.75 ? 'Ende' : 'Bewegung';
         } else if (frames.length >= 3) {
-          // Start -> Übergang -> Ende -> Übergang -> Start über 3.8 Sekunden
           const segDur = 950;
           const total = segDur * 4;
           const pos = (now % total) / segDur;
@@ -315,7 +309,7 @@
     const mode = getExecMode(e);
     const isUni = window.v3IsUnilateral(e);
     const tags = Array.isArray(e.tags) ? e.tags : [];
-    const phases = Array.isArray(e.phases) && e.phases.length ? e.phases : (mode === 'sequence' ? window.v3GetExercisePhases(e, 20) : []);
+    const phases = Array.isArray(e.phases) && e.phases.length ? e.phases : (mode === 'sequence' && typeof window.v3GetExercisePhases === 'function' ? window.v3GetExercisePhases(e, 20) : []);
 
     let modeBadge = '';
     let modeAction = '';
@@ -331,7 +325,9 @@
         </div>`;
     } else if (mode === 'hold') {
       modeBadge = `<span class="v3-type-badge hold">⏱️ Halte-Übung (Statisch)</span>`;
-      modeAction = `<div style="margin-top:6px"><button type="button" class="b g" style="padding:6px 12px;min-height:38px;font-size:13px" onclick="v3OpenPhaseTimer('${e.id}',30)">⏱️ 30s Halte-Timer starten</button></div>`;
+      if (typeof window.v3OpenPhaseTimer === 'function') {
+        modeAction = `<div style="margin-top:6px"><button type="button" class="b g" style="padding:6px 12px;min-height:38px;font-size:13px" onclick="v3OpenPhaseTimer('${e.id}',30)">⏱️ 30s Halte-Timer starten</button></div>`;
+      }
     } else {
       modeBadge = `<span class="v3-type-badge reps">🔁 Wiederholungsübung</span>`;
     }
@@ -344,7 +340,6 @@
     return `<div class="v3-ex-meta-box"><div class="r" style="gap:6px">${modeBadge}${uniBadge}</div>${tagChips}${modeAction}</div>`;
   }
 
-  // Überschreibe detTxt(e), damit Start, optionaler Übergang, Ende + Live-Morphing + Typ-Info angezeigt werden
   detTxt = function (e) {
     const hasMid = !!(e.figMid || (Array.isArray(e.fig) && e.fig[2]));
     const midStr = e.figMid || (Array.isArray(e.fig) ? e.fig[2] : '');
@@ -378,7 +373,6 @@
       <a target="_blank" rel="noopener" href="https://www.youtube.com/results?search_query=${encodeURIComponent(e.n + ' Übung Anleitung')}">▶ Videos auf YouTube suchen</a>`;
   };
 
-  // Auch in der großen Übungsbibliothek (vLib) bei geöffneter Übung Morphing, Übergang, Tags und Typ-Banner einblenden
   const _prevLibList = libList;
   libList = function (l) {
     const html = _prevLibList(l);
@@ -422,12 +416,11 @@
     return tpl.innerHTML;
   };
 
-  // Spezieller Multi-Balken-Timer für Abfolge-Übungen (alle Phasen-Balken sichtbar untereinander)
   let SEQ = null;
   window.v3OpenSequenceTimer = function (exId, targetVal, onComplete) {
     const e = ex(exId);
     if (!e) return;
-    const phases = window.v3GetExercisePhases ? window.v3GetExercisePhases(e, targetVal) : (e.phases || [{ label: e.n, sec: 20 }]);
+    const phases = typeof window.v3GetExercisePhases === 'function' ? window.v3GetExercisePhases(e, targetVal) : (e.phases || [{ label: e.n, sec: 20 }]);
     if (!phases.length) return;
 
     try {
@@ -576,21 +569,12 @@
 
     const p = S.plans.find(x => x.id === pid);
     if (!p || !p.items[idx]) return;
-    const eff = effective(p.items[idx], p);
-
-    // Berechne, wie viele Sätze komplett (L + R) erledigt sind
-    let completedSets = 0;
-    for (let s = 1; s <= eff.sets; s++) {
-      const st = S.lrLog[dt][pid][idx][s];
-      if (st && st.L && st.R) completedSets = s;
-      else break;
-    }
 
     const currentLogged = Number(((S.log[dt] || {})[pid] || {})[idx]) || 0;
     if (cur.L && cur.R && setNum > currentLogged) {
       tick(dt, pid, idx, setNum);
     } else if ((!cur.L || !cur.R) && currentLogged >= setNum) {
-      tick(dt, pid, idx, setNum); // setzt in app.js auf setNum - 1 zurück
+      tick(dt, pid, idx, setNum);
     } else {
       save();
       render();
@@ -621,7 +605,6 @@
       const actionRow = setBtn?.parentElement;
       if (!actionRow) return;
 
-      // Falls Abfolge-Übung: Startbutton auf Multi-Bar Sequence Timer umbiegen
       if (getExecMode(e) === 'sequence') {
         const holdBtn = actionRow.querySelector('button[onclick^="holdT("]');
         if (holdBtn) {
@@ -630,7 +613,6 @@
         }
       }
 
-      // Falls Unilateral (Links / Rechts getrennt abhaken aktiv): L/R-Leiste unter den Satz-Buttons einblenden
       if (window.v3IsUnilateral(e)) {
         const doneCount = Number(((S.log[dt] || {})[pid] || {})[idx]) || 0;
         const lrMap = (((S.lrLog[dt] || {})[pid] || {})[idx] || {});
@@ -689,7 +671,7 @@
       g: '',
       x: '',
       hasMid: false,
-      activePhase: 0, // 0: Start, 1: Übergang, 2: Ende
+      activePhase: 0,
       selectedJoint: 'knee1',
       frames: [
         parseFigString(stdStanding),
@@ -873,14 +855,12 @@
     const draftEx = syncDraftToPreviewEx();
     const curStr = serializeFigData(fr);
 
-    // Hintergrund: Hilfsraster + Bodenlinie + echtes figSvg()
     let gridLines = '';
     for (let g = 6; g < 48; g += 6) {
       gridLines += `<line x1="${g}" y1="0" x2="${g}" y2="48" stroke="var(--bd)" stroke-width="0.25" opacity="0.5"/>`;
       gridLines += `<line x1="0" y1="${g}" x2="48" y2="${g}" stroke="var(--bd)" stroke-width="0.25" opacity="0.5"/>`;
     }
 
-    // Ziehpunkte für die 7 Hauptgelenke + optionale Zweit-Gliedmaßen
     let handles = '';
     JOINT_META.forEach(j => {
       const cx = fr.coords[j.idx];
@@ -907,7 +887,6 @@
       });
     }
 
-    // Extrahiere den inneren Inhalt von figSvg(curStr, draftEx)
     const innerFig = figSvg(curStr, draftEx).replace(/^<svg[^>]*>|<\/svg>$/g, '');
 
     return `
@@ -1013,7 +992,6 @@
       return;
     }
     const exObj = syncDraftToPreviewEx();
-    // Bereinige optionale leere Felder für sauberes JSON
     const clean = {
       id: exObj.id,
       n: exObj.n.trim(),
@@ -1053,7 +1031,6 @@
   };
 
   window.v3AdminExportExercisesJson = function () {
-    // Exportiere alle offiziellen Übungen aus EX (ohne S.custom 'c...')
     const official = EX.filter(x => x && String(x.id)[0] !== 'c');
     const jsonText = JSON.stringify(official, null, 2);
     const blob = new Blob([jsonText], { type: 'application/json;charset=utf-8' });
@@ -1091,7 +1068,6 @@
 
   function renderAdminStudioCard() {
     const fr = AD.frames[AD.activePhase];
-    const draftEx = syncDraftToPreviewEx();
     const activeRegions = Object.keys(REG).filter(r => REG[r].test((AD.n || '') + ' ' + (AD.g || '')));
 
     return `
@@ -1101,7 +1077,6 @@
           <div style="margin-top:12px">
             <p class="mu" style="font-size:13px;margin-top:0">Erstelle neue Übungen oder passe bestehende an. Positioniere das Strichmännchen per Drag & Drop an den Gelenken und exportiere anschließend die fertige <code>exercises.json</code>.</p>
 
-            <!-- 1. Übung auswählen oder neu anlegen -->
             <div class="r" style="gap:8px;margin-bottom:10px">
               <select style="flex:1" onchange="v3AdminLoadExercise(this.value)" aria-label="Übung zum Bearbeiten wählen">
                 <option value="__new__" ${AD.isNew ? 'selected' : ''}>➕ Neue Übung anlegen (${AD.isNew ? AD.id : 'nächste freie ID'})</option>
@@ -1110,14 +1085,12 @@
               <button type="button" class="chip" onclick="v3AdminLoadExercise('__new__')">Neu</button>
             </div>
 
-            <!-- 2. Interaktiver 3-Phasen Gelenk-Editor -->
             <div class="v3-admin-box">
               <div class="r" style="justify-content:space-between;margin-bottom:8px">
                 <b>🎨 Strichmännchen-Editor (48×48 Raster)</b>
                 <span class="mu" style="font-size:12px">ID: <b>${esc(AD.id)}</b></span>
               </div>
 
-              <!-- Phasen-Tabs: Start / Übergang / Ende -->
               <div class="r" style="gap:6px;margin-bottom:8px">
                 <button type="button" class="chip ${AD.activePhase === 0 ? 'on' : ''}" style="flex:1;padding:8px" onclick="v3AdminSetPhase(0)">1. Start</button>
                 <button type="button" class="chip ${AD.activePhase === 1 ? 'on' : ''}" style="flex:1;padding:8px" onclick="v3AdminSetPhase(1)">2. Übergang ${AD.hasMid ? '✓' : '(opt.)'}</button>
@@ -1167,7 +1140,6 @@
               </label>
             </div>
 
-            <!-- 3. Beanspruchte Körperregionen (steuert orange Muskel-Markierung & BodyMap) -->
             <div class="v3-admin-box">
               <b>🔥 Beanspruchte Muskelpartien (färbt Körperteile automatisch ein)</b>
               <div class="r" style="gap:6px;margin-top:6px">
@@ -1180,7 +1152,6 @@
               </div>
             </div>
 
-            <!-- 4. Übungs-Typisierung & Links/Rechts-Option -->
             <div class="v3-admin-box">
               <b>⚙️ Übungs-Typ & Ausführung (steuert Timer & Info-Anzeige)</b>
               <div class="r" style="gap:6px;margin-top:6px">
@@ -1213,7 +1184,6 @@
                 </div>` : ''}
             </div>
 
-            <!-- 5. Stammdaten, Hashtags & YouTube-Videos -->
             <div class="v3-admin-box">
               <b>📝 Text, Hashtags & Beispielvideos</b>
               <div class="r" style="margin-top:6px">
@@ -1261,7 +1231,6 @@
               <label class="mu" style="font-size:12px;margin-top:6px;display:block">Genauere Anleitung (optional)</label>
               <textarea rows="2" oninput="AD.l=this.value">${esc(AD.l)}</textarea>
 
-              <!-- Mehrere YouTube-Links -->
               <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bd)">
                 <b style="font-size:13px">🎬 YouTube-Beispielvideos (${AD.ytList.length})</b>
                 ${AD.ytList.map((v, i) => `
@@ -1278,7 +1247,6 @@
               </div>
             </div>
 
-            <!-- 6. Speichern & exercises.json Export -->
             <div class="r" style="gap:8px;margin-top:12px">
               <button type="button" class="b" style="flex:1" onclick="v3AdminSaveExercise()">💾 Übung im Katalog speichern (${esc(AD.id)})</button>
               <button type="button" class="b g" style="flex:1" onclick="v3AdminExportExercisesJson()">📥 exercises.json exportieren</button>
@@ -1288,7 +1256,6 @@
       </div>`;
   }
 
-  // Karte in vSet() direkt VOR Datenschutz/Impressum einfügen
   const _prevVSetAdmin = vSet;
   vSet = function () {
     const html = _prevVSetAdmin();
@@ -1418,11 +1385,9 @@
     const acCol = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim() || '#0f766e';
     const bdCol = isDark ? '#334155' : '#e2e8f0';
 
-    // Hintergrund
     ctx.fillStyle = bgCol;
     ctx.fillRect(0, 0, width, height);
 
-    // Kopfbereich
     ctx.fillStyle = acCol;
     ctx.fillRect(0, 0, width, 8);
     ctx.fillStyle = txCol;
@@ -1441,12 +1406,10 @@
     ctx.lineTo(width - 28, 94);
     ctx.stroke();
 
-    // Übungszeilen inkl. Start/Ende-Strichmännchen rendern
     for (let i = 0; i < items.length; i++) {
       const { eff, e } = items[i];
       const y = headerH + i * rowH - 6;
 
-      // Zeilen-Karte
       ctx.fillStyle = cardCol;
       ctx.strokeStyle = bdCol;
       ctx.beginPath();
@@ -1454,7 +1417,6 @@
       ctx.fill();
       ctx.stroke();
 
-      // Start- & Ende-SVG zeichnen
       const f0 = e.fig?.[0];
       const f1 = e.fig?.[1] || f0;
       if (f0 && !f0.startsWith('BR')) {
@@ -1466,7 +1428,6 @@
         if (img1) ctx.drawImage(img1, 114, y + 10, 72, 72);
       }
 
-      // Textspalte
       const textX = 202;
       ctx.fillStyle = txCol;
       ctx.font = 'bold 17px system-ui, -apple-system, sans-serif';
@@ -1484,15 +1445,13 @@
         ctx.fillText(`Ziel: ${goalShort}`, textX, y + 72);
       }
 
-      // Dosis rechtsbündig
-      const doseTxt = `${eff.sets} × ${eff.reps} ${unit(e)}${+eff.kg ? ' · ' + eff.kg + ' kg' : ''}`;
+      const doseTxt = `${eff.sets} × ${eff.reps} ${window.v3Unit(e)}${+eff.kg ? ' · ' + eff.kg + ' kg' : ''}`;
       ctx.fillStyle = acCol;
       ctx.font = 'bold 17px system-ui, -apple-system, sans-serif';
       const tw = ctx.measureText(doseTxt).width;
       ctx.fillText(doseTxt, width - 42 - tw, y + 32);
     }
 
-    // Footer
     ctx.fillStyle = muCol;
     ctx.font = '12px system-ui, -apple-system, sans-serif';
     ctx.fillText(`Erstellt mit „Mein Training“ · Stand: ${new Date().toLocaleDateString('de-AT')}`, 28, height - 16);
@@ -1562,7 +1521,7 @@
             <small style="color:#475569">${esc(e.d || '')}</small>
           </td>
           <td style="white-space:nowrap;font-weight:700">
-            ${eff.sets} × ${eff.reps} ${unit(e)}<br>
+            ${eff.sets} × ${eff.reps} ${window.v3Unit(e)}<br>
             <small>${+eff.kg ? eff.kg + ' kg' : 'Eigengewicht'}</small>
           </td>
           <td style="min-width:140px"></td>
