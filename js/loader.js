@@ -7,8 +7,8 @@
   const REMOTE_URL_KEY = 'mt_remote_data_url';
   const ADMIN_STORAGE_KEY = 'mt_admin_catalog_overrides_v1';
 
-  // HIER deine feste GitHub-Pages URL eintragen (wird von der installierten Android-APK automatisch genutzt):
-  const DEFAULT_REMOTE_DATA_BASE = 'https://DEIN-GITHUB-USERNAME.github.io/DEIN-REPO/data/';
+  const DEFAULT_REMOTE_DATA_BASE = '[https://mounta1ner.github.io/MeinTraining/data/](https://mounta1ner.github.io/MeinTraining/data/)'; )
+  const DEFAULT_REMOTE_DATA_BASE = 'https://mounta1ner.github.io/MeinTraining/data/';
 
   const paths = ['exercises', 'plans', 'translations'];
   const modules = [
