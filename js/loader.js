@@ -7,7 +7,7 @@
   const REMOTE_URL_KEY = 'mt_remote_data_url';
   const ADMIN_STORAGE_KEY = 'mt_admin_catalog_overrides_v1';
 
-  const DEFAULT_REMOTE_DATA_BASE = '[https://mounta1ner.github.io/MeinTraining/data/](https://mounta1ner.github.io/MeinTraining/data/)'; )
+  // Feste GitHub-Pages URL (wird von der installierten Android-APK automatisch genutzt):
   const DEFAULT_REMOTE_DATA_BASE = 'https://mounta1ner.github.io/MeinTraining/data/';
 
   const paths = ['exercises', 'plans', 'translations'];
@@ -31,7 +31,6 @@
     return clean.endsWith('/') ? clean : clean + '/';
   }
 
-  // Ermittelt die beste Quelle für Online-Updates (in der APK -> GitHub Pages, im Web -> ./data/ oder Custom-URL)
   window.v3GetRemoteDataBase = function () {
     const custom = normalizeBaseUrl(localStorage.getItem(REMOTE_URL_KEY));
     if (custom) return custom;
@@ -111,8 +110,6 @@
     return data;
   }
 
-  // Entfernt doppelte "Laufen"-Einträge (falls ADD6_RAW aus app.js und exercises.json aufeinandertreffen)
-  // und wendet lokale Admin-Bearbeitungen (mt_admin_catalog_overrides_v1) wieder darüber an.
   function buildCleanOfficialExerciseList(rawExercises) {
     const list = [];
     const seenIds = new Set();
@@ -136,7 +133,6 @@
       }
     }
 
-    // Falls "Laufen" noch nicht in der geladenen JSON war, aber in EX (aus ADD6_RAW) existiert, behalten
     if (!laufenSeen && typeof EX !== 'undefined' && Array.isArray(EX)) {
       const existingLaufen = EX.find(x => x && x.n === 'Laufen');
       if (existingLaufen) {
@@ -149,7 +145,6 @@
       }
     }
 
-    // Lokale Admin-Overrides (vom Ersteller lokal gespeicherte Übungen) darüberlegen
     try {
       const adminRaw = localStorage.getItem(ADMIN_STORAGE_KEY);
       if (adminRaw) {
@@ -176,7 +171,6 @@
     }
   }
 
-  // --- OTA HINTERGRUND-SYNCHRONISATION ---
   let syncInProgress = false;
   window.v3SyncCatalogNow = async function (silent = true) {
     if (syncInProgress) return false;
@@ -192,7 +186,6 @@
         throw Error('Ungueltiges exercises.json Format');
       }
 
-      // Optional auch plans.json und translations.json aktualisieren (falls erreichbar)
       let remotePlans = window.FITNESS_CATALOG?.plans;
       let remoteTrans = window.FITNESS_CATALOG?.translations;
       try {
@@ -215,7 +208,6 @@
       const oldFp = readCatalogMeta().fingerprint || computeCatalogFingerprint(typeof EX !== 'undefined' ? EX : []);
       const newFp = computeCatalogFingerprint(mergedOfficial);
 
-      // Speichere im Offline-Cache
       writeCachedCatalog([mergedOfficial, remotePlans, remoteTrans]);
       writeCatalogMeta({
         lastCheck: new Date().toISOString(),
@@ -224,7 +216,6 @@
         fingerprint: newFp
       });
 
-      // Aktualisiere EX in-place (alle Referenzen in app.js bleiben erhalten, S.custom bleibt in all() unberührt!)
       if (typeof EX !== 'undefined' && Array.isArray(EX)) {
         EX.splice(0, EX.length, ...mergedOfficial);
       }
@@ -276,7 +267,6 @@
     window.v3SyncCatalogNow(false);
   };
 
-  // --- UI-INJEKTION FÜR EINSTELLUNGEN (MANUELLER SYNC) & ADMIN-MODUS (URL-FELD) ---
   function installOtaSettingsUi() {
     if (typeof vSet !== 'function') return;
     const _prevVSetOta = vSet;
@@ -299,7 +289,6 @@
       const customCount = typeof S !== 'undefined' && Array.isArray(S.custom) ? S.custom.length : 0;
       const savedUrl = localStorage.getItem(REMOTE_URL_KEY) || '';
 
-      // 1. Karte für manuelles Katalog-Update in den Einstellungen
       const syncCard = document.createElement('div');
       syncCard.className = 'c';
       syncCard.innerHTML = `
@@ -315,7 +304,6 @@
       if (adminCard) {
         adminCard.before(syncCard);
 
-        // 2. Im Admin-Studio das Eingabefeld für die REMOTE_DATA_BASE-URL (GitHub Pages) ergänzen
         const adminDetailsBody = adminCard.querySelector('details > div');
         if (adminDetailsBody && !adminDetailsBody.querySelector('#v3RemoteUrlInput')) {
           const otaBox = document.createElement('div');
@@ -324,10 +312,10 @@
           otaBox.innerHTML = `
             <b>🌐 Over-the-Air Update-Server (GitHub Pages URL für APK & Web)</b>
             <p class="mu" style="font-size:12px;margin:4px 0 6px">
-              Ordner-URL, unter der deine exportierte <code>exercises.json</code> online liegt (aktiv: <code>${ window.v3GetRemoteDataBase() }</code>):
+              Ordner-URL, unter der deine exportierte <code>exercises.json</code> online liegt (aktiv: <code>${window.v3GetRemoteDataBase()}</code>):
             </p>
             <div class="r" style="gap:6px">
-              <input id="v3RemoteUrlInput" style="flex:1" value="${savedUrl.replace(/"/g, '"')}" placeholder="https://dein-name.github.io/mein-training/data/">
+              <input id="v3RemoteUrlInput" style="flex:1" value="${savedUrl.replace(/"/g, '&quot;')}" placeholder="https://mounta1ner.github.io/MeinTraining/data/">
               <button type="button" class="chip" onclick="v3SaveRemoteUrl(document.getElementById('v3RemoteUrlInput').value)">💾 URL speichern & testen</button>
             </div>`;
           adminDetailsBody.appendChild(otaBox);
@@ -340,7 +328,6 @@
     };
   }
 
-  // --- STARTUP: 1. SOFORTIGER OFFLINE-START (0 ms) -> 2. MODULE LADEN -> 3. HINTERGRUND-SYNC ---
   try {
     let initialData = readCachedCatalog();
     if (!initialData) {
@@ -364,7 +351,6 @@
       });
     }
 
-    // Bereinige unmittelbar nach dem Laden von app.js eventuelle "Laufen"-Duplikate aus dem Cache
     if (typeof EX !== 'undefined' && Array.isArray(EX)) {
       const cleanInitial = buildCleanOfficialExerciseList(EX);
       EX.splice(0, EX.length, ...cleanInitial);
@@ -373,12 +359,10 @@
     installOtaSettingsUi();
     if (typeof render === 'function') render();
 
-    // Service Worker für Offline-PWA registrieren (falls noch nicht aktiv)
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
 
-    // Hintergrund-Sync beim App-Start & bei Rückkehr in die App (Focus / Visibility)
     setTimeout(() => window.v3SyncCatalogNow(true), 900);
     window.addEventListener('focus', () => window.v3SyncCatalogNow(true));
     document.addEventListener('visibilitychange', () => {
