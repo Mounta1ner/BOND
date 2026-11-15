@@ -22,7 +22,8 @@
     'v3_workout',
     'v3_progression',
     'v3_ux',
-    'v3_admin'
+    'v3_admin',
+    'v3_mind'
   ];
 
   function normalizeBaseUrl(url) {
@@ -289,16 +290,21 @@
       const customCount = typeof S !== 'undefined' && Array.isArray(S.custom) ? S.custom.length : 0;
       const savedUrl = localStorage.getItem(REMOTE_URL_KEY) || '';
 
+      const isSyncOpen = !!(typeof S !== 'undefined' && S.ui?.settingsOpen?.catalogSync);
       const syncCard = document.createElement('div');
       syncCard.className = 'c';
       syncCard.innerHTML = `
-        <h3>🔄 Übungskatalog & Online-Updates</h3>
-        <p class="mu" style="font-size:13px;margin:4px 0 8px">
-          Stand: <b>${exCount} offizielle Übungen</b>${customCount ? ` (+ ${customCount} eigene)` : ''} · Zuletzt geprüft: <b>${lastCheckLabel}</b>
-        </p>
-        <div class="r" style="gap:8px">
-          <button type="button" class="b g" onclick="v3SyncCatalogNow(false)">🔄 Übungskatalog jetzt prüfen</button>
-        </div>`;
+        <details ${isSyncOpen ? 'open' : ''} ontoggle="if(typeof d282ToggleSettings==='function')d282ToggleSettings('catalogSync',this.open)">
+          <summary style="font-weight:700;cursor:pointer">🔄 Übungskatalog & Online-Updates</summary>
+          <div style="margin-top:12px">
+            <p class="mu" style="font-size:13px;margin:4px 0 8px">
+              Stand: <b>${exCount} offizielle Übungen</b>${customCount ? ` (+ ${customCount} eigene)` : ''} · Zuletzt geprüft: <b>${lastCheckLabel}</b>
+            </p>
+            <div class="r" style="gap:8px">
+              <button type="button" class="b g" onclick="v3SyncCatalogNow(false)">🔄 Übungskatalog jetzt prüfen</button>
+            </div>
+          </div>
+        </details>`;
 
       const adminCard = tpl.content.querySelector('#v3AdminStudioCard');
       if (adminCard) {

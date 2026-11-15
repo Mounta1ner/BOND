@@ -1,4 +1,4 @@
-/* Mein Training v3.0 - Modul 4: Streak-Freeze / Joker, Pausier-Modus, Plan-Duplizieren & Heatmap */
+/* Mein Training / Bond v3.0 - Modul 4: Streak-Freeze / Joker, Pausier-Modus, Plan-Duplizieren & Heatmap */
 (function () {
   'use strict';
 
@@ -263,6 +263,8 @@
     const reasonEl = document.getElementById('v3PauseReason');
     const untilEl = document.getElementById('v3PauseUntil');
     S.pauseMode.active = !!active;
+    S.ui.settingsOpen = S.ui.settingsOpen || {};
+    S.ui.settingsOpen.pauseJoker = true;
     if (active) {
       S.pauseMode.since = iso();
       S.pauseMode.reason = reasonEl?.value?.trim() || 'Krankheit / Urlaub';
@@ -281,6 +283,8 @@
     const untilEl = document.getElementById('v3PauseUntil');
     if (reasonEl) S.pauseMode.reason = reasonEl.value.trim() || 'Krankheit / Urlaub';
     if (untilEl) S.pauseMode.until = untilEl.value || '';
+    S.ui.settingsOpen = S.ui.settingsOpen || {};
+    S.ui.settingsOpen.pauseJoker = true;
     syncPauseModeDates();
     save();
     toast('Pausier-Einstellungen gespeichert');
@@ -438,7 +442,7 @@
     return html;
   }
 
-  // --- 8. PLAN DUPLIZIEREN (vPlans) ---
+  // --- 8. PLAN DUPLIZIEREN (Funktion für Einstellungen -> Pläne & Verlauf sichern) ---
   window.v3DuplicatePlan = function (pid) {
     const p = S.plans.find(x => x.id === pid);
     if (!p) return;
@@ -450,29 +454,6 @@
     save();
     render();
     toast(`📋 Plan „${copy.name}“ angelegt`);
-  };
-
-  const _prevVPlansUx = vPlans;
-  vPlans = function () {
-    const html = _prevVPlansUx();
-    if (ed) return html;
-    const tpl = document.createElement('template');
-    tpl.innerHTML = html;
-
-    const editBtns = tpl.content.querySelectorAll('button[onclick^="editPlan(\'"]');
-    editBtns.forEach(btn => {
-      const m = (btn.getAttribute('onclick') || '').match(/^editPlan\('([^']+)'\)$/);
-      if (!m) return;
-      const pid = m[1];
-      const dupBtn = document.createElement('button');
-      dupBtn.type = 'button';
-      dupBtn.className = 'b g';
-      dupBtn.setAttribute('onclick', `v3DuplicatePlan('${pid}')`);
-      dupBtn.innerHTML = '📋 Duplizieren';
-      btn.after(dupBtn);
-    });
-
-    return tpl.innerHTML;
   };
 
   // --- 9. 26 / 52-WOCHEN AKTIVITÄTS-HEATMAP IM DASHBOARD ---
@@ -733,7 +714,6 @@
     const tpl = document.createElement('template');
     tpl.innerHTML = html;
 
-    // 1. Top-Statistik-Kacheln mit geschützten Werten aktualisieren
     const pStats = window.v3ComputeProtectedDashboardStats();
     const firstStatsRow = tpl.content.querySelector('.d282-stats');
     if (firstStatsRow) {
@@ -743,7 +723,6 @@
       if (tiles[2]) tiles[2].textContent = pStats.miss;
     }
 
-    // 2. Warnbanner oben im Dashboard einfügen
     const rescueHtml = renderStreakRescueBannerHtml();
     if (rescueHtml) {
       const h2 = tpl.content.querySelector('h2');
@@ -753,7 +732,6 @@
       else tpl.content.prepend(...wrap.content.children);
     }
 
-    // 3. Heatmap einfügen (unter Berücksichtigung von Sichtbarkeit & Reihenfolge)
     if (!tpl.content.querySelector('[data-v3-section="heatmap"]') && S.ui.historyVisible?.heatmap !== false) {
       const hmWrap = document.createElement('template');
       hmWrap.innerHTML = window.v3HeatmapCard();
@@ -762,7 +740,6 @@
       else tpl.content.appendChild(hmWrap.content.firstElementChild);
     }
 
-    // 4. „Absolvierte Einzelübungen“ einklappbar machen (beim Start eingeklappt)
     const exCard = [...tpl.content.querySelectorAll('.c')].find(c => /^Absolvierte Einzelübungen/i.test(c.querySelector(':scope > h3')?.textContent?.trim() || ''));
     if (exCard) {
       const h3 = exCard.querySelector(':scope > h3');
@@ -775,7 +752,6 @@
       exCard.innerHTML = `<details ${openAttr} ontoggle="S.ui.v3ExercisesOpen=this.open;save()"><summary style="font-weight:700;cursor:pointer">${esc(titleText)} (${count})</summary><div style="margin-top:8px">${innerHtml}</div></details>`;
     }
 
-    // 5. In der Aktivitäten-Karte im Dashboard „🃏 Gestern nachbuchen“ ergänzen
     const actCard = [...tpl.content.querySelectorAll('.c')].find(c => /⚡ Aktivitäten/i.test(c.querySelector('h3')?.textContent || ''));
     if (actCard && S.habits.length && !actCard.querySelector('.v3-backfill-hist-btn')) {
       const yesterday = shiftDate(iso(), -1);
@@ -797,7 +773,6 @@
     const tpl = document.createElement('template');
     tpl.innerHTML = html;
 
-    // 1. Repariere alle "undefined"-Labels in "Verlauf Reihung und Anzeige konfigurieren"
     const historyCheckboxes = tpl.content.querySelectorAll('input[onchange^="d282ToggleHistory("]');
     historyCheckboxes.forEach(cb => {
       const m = (cb.getAttribute('onchange') || '').match(/^d282ToggleHistory\('([^']+)'/);
@@ -813,7 +788,6 @@
       }
     });
 
-    // Falls 'heatmap' noch gar nicht in der Liste stand, ergänzen
     if (!tpl.content.querySelector('input[onchange^="d282ToggleHistory(\'heatmap\'"]')) {
       const histSummary = [...tpl.content.querySelectorAll('summary')].find(s => /Verlauf Reihung|Configure history/i.test(s.textContent || ''));
       const container = histSummary?.parentElement?.querySelector('div');
@@ -827,39 +801,43 @@
       }
     }
 
-    // 2. Einstellungen für „🛡️ Serien-Schutz: Joker & Pausier-Modus“ ergänzen
     const jStats = window.v3GetJokerStats();
+    const isPauseOpen = !!S.ui.settingsOpen?.pauseJoker;
     const pauseCard = document.createElement('div');
     pauseCard.className = 'c';
     pauseCard.innerHTML = `
-      <h3>🛡️ Serien-Schutz: Joker & Pausier-Modus</h3>
-      <p class="mu" style="font-size:13px;margin:4px 0 10px">
-        Du erhältst jeden Monat <b>2 Joker</b>, um verpasste Pflichttage zu überbrücken oder vergessene Aktivitäten nachzubuchen. Bei Krankheit oder Urlaub kannst du deine Serien hier pausieren.
-      </p>
-      <div class="v3-joker-pill-bar" style="margin-bottom:10px">
-        <span>🃏 Diesen Monat frei: <b>${jStats.remaining} von ${jStats.max}</b></span>
-        <span class="mu" style="font-size:12px">Genutzt: ${jStats.used}×</span>
-      </div>
-      <label class="settingsRow">
-        <input type="checkbox" ${S.pauseMode.active ? 'checked' : ''} onchange="v3TogglePauseMode(this.checked)">
-        <b>⏸️ Pausier-Modus aktivieren (Krankheit / Urlaub / Verletzung)</b>
-      </label>
-      <div class="r" style="margin-top:8px">
-        <div style="flex:1;min-width:150px">
-          <label class="mu" style="font-size:12px">Grund</label>
-          <input id="v3PauseReason" value="${esc(S.pauseMode.reason || 'Krankheit / Erholung')}" placeholder="z. B. Erkältung, Urlaub">
+      <details ${isPauseOpen ? 'open' : ''} ontoggle="d282ToggleSettings('pauseJoker',this.open)">
+        <summary style="font-weight:700;cursor:pointer">🛡️ Serien-Schutz: Joker & Pausier-Modus</summary>
+        <div style="margin-top:12px">
+          <p class="mu" style="font-size:13px;margin:4px 0 10px">
+            Du erhältst jeden Monat <b>2 Joker</b>, um verpasste Pflichttage zu überbrücken oder vergessene Aktivitäten nachzubuchen. Bei Krankheit oder Urlaub kannst du deine Serien hier pausieren.
+          </p>
+          <div class="v3-joker-pill-bar" style="margin-bottom:10px">
+            <span>🃏 Diesen Monat frei: <b>${jStats.remaining} von ${jStats.max}</b></span>
+            <span class="mu" style="font-size:12px">Genutzt: ${jStats.used}×</span>
+          </div>
+          <label class="settingsRow">
+            <input type="checkbox" ${S.pauseMode.active ? 'checked' : ''} onchange="v3TogglePauseMode(this.checked)">
+            <b>⏸️ Pausier-Modus aktivieren (Krankheit / Urlaub / Verletzung)</b>
+          </label>
+          <div class="r" style="margin-top:8px">
+            <div style="flex:1;min-width:150px">
+              <label class="mu" style="font-size:12px">Grund</label>
+              <input id="v3PauseReason" value="${esc(S.pauseMode.reason || 'Krankheit / Erholung')}" placeholder="z. B. Erkältung, Urlaub">
+            </div>
+            <div style="flex:1;min-width:140px">
+              <label class="mu" style="font-size:12px">Pausiert bis (einschließlich)</label>
+              <input id="v3PauseUntil" type="date" value="${esc(S.pauseMode.until || shiftDate(iso(), 7))}">
+            </div>
+          </div>
+          <div class="r" style="margin-top:10px;gap:8px">
+            <button type="button" class="b g" onclick="v3SavePauseSettings()">💾 Pause-Zeitraum speichern</button>
+            ${S.habits.length ? `<button type="button" class="chip" onclick="v3OpenBackfillModal()">🃏 Aktivität nachbuchen</button>` : ''}
+          </div>
         </div>
-        <div style="flex:1;min-width:140px">
-          <label class="mu" style="font-size:12px">Pausiert bis (einschließlich)</label>
-          <input id="v3PauseUntil" type="date" value="${esc(S.pauseMode.until || shiftDate(iso(), 7))}">
-        </div>
-      </div>
-      <div class="r" style="margin-top:10px;gap:8px">
-        <button type="button" class="b g" onclick="v3SavePauseSettings()">💾 Pause-Zeitraum speichern</button>
-        ${S.habits.length ? `<button type="button" class="chip" onclick="v3OpenBackfillModal()">🃏 Aktivität nachbuchen</button>` : ''}
-      </div>`;
+      </details>`;
 
-    const trainingCard = [...tpl.content.querySelectorAll('.c')].find(c => /^Training$|^Workout$/i.test(c.querySelector('h3')?.textContent || ''));
+    const trainingCard = [...tpl.content.querySelectorAll('.c')].find(c => /^Training$|^Workout$/i.test(c.querySelector('h3, summary')?.textContent || ''));
     if (trainingCard) trainingCard.after(pauseCard);
     else tpl.content.appendChild(pauseCard);
 

@@ -1,12 +1,16 @@
-/* Mein Training v3.0 - Modul 5: Admin-Studio, Gelenk-Editor, Morphing, Unilateral & Plan-Export */
+/* Mein Training / Bond v3.0 - Modul 5: Admin-Studio, Gelenk-Editor (Touch/Mouse Fix), Morphing, Unilateral & Plan-Export */
 (function () {
   'use strict';
 
   const ADMIN_STORAGE_KEY = 'mt_admin_catalog_overrides_v1';
   S.lrLog = S.lrLog || {};
   S.ui = S.ui || {};
+  S.ui.settingsOpen = S.ui.settingsOpen || {};
 
-  // Bekannte einseitige Übungen standardmäßig als unilateral markieren (falls nicht im JSON gesetzt)
+  // Standard-Stehpose im 48x48 Koordinatensystem
+  const STD_STANDING_FIG = '24,7,24,13,24,27,24,36,24,44,24,20,24,27';
+  const STD_END_FIG = '26,15,23,21,15,32,28,33,25,44,29,20,34,20';
+
   const DEFAULT_UNILATERAL_IDS = new Set([
     'e1', 'e6', 'e9', 'e16', 'e17', 'e19', 'e20', 'e21', 'e22', 'e23',
     'e26', 'e27', 'e28', 'e35', 'e36', 'e40', 'e41', 'e46', 'e47',
@@ -14,7 +18,6 @@
     'e62', 'e75', 'e76', 'e80', 'e82', 'e86', 'e89', 'e101'
   ]);
 
-  // Typische Schlüsselwörter pro Körperregion (damit REG[r] in app.js zuverlässig matcht)
   const REGION_KEYWORDS = {
     'Nacken': 'Nacken',
     'Schulter': 'Schulter',
@@ -27,7 +30,6 @@
     'Ganzkörper': 'Ganzkörper'
   };
 
-  // Hilfsmittel-Vorlagen (SVG-Pfade im 48x48 Raster)
   const PROP_PRESETS = {
     none: { label: 'Kein Hilfsmittel-Pfad', path: '' },
     wallLeft: { label: '🧱 Wand links', path: 'M12 0L12 44' },
@@ -153,10 +155,21 @@
     d.innerHTML = `<div style="position:relative;padding-top:56.25%;margin-top:8px"><iframe src="https://www.youtube-nocookie.com/embed/${esc(videoId)}" title="Video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:12px" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div><p class="mu" style="font-size:12px">Startet das Video nicht, öffne es über den Link.</p>`;
   };
 
-  // --- 3. MORPHING-ANIMATION (START -> ÜBERGANG -> ENDE) ---
+  // --- 3. MORPHING-ANIMATION & VEKTOR-PARSER ---
+  function isCorruptedCornerCoords(coords) {
+    if (!Array.isArray(coords) || coords.length < 14) return true;
+    let cornerCount = 0;
+    for (let i = 0; i < 14; i += 2) {
+      if ((coords[i] >= 46 && coords[i + 1] >= 45) || (coords[i] <= 1 && coords[i + 1] <= 1)) {
+        cornerCount++;
+      }
+    }
+    return cornerCount >= 4;
+  }
+
   function parseFigString(str) {
     const defaultCoords = [24, 7, 24, 13, 24, 27, 24, 36, 24, 44, 24, 20, 24, 27];
-    if (!str || typeof str !== 'string' || str.startsWith('BR')) {
+    if (!str || typeof str !== 'string' || str.startsWith('BR') || str.startsWith('MD_')) {
       return {
         coords: defaultCoords.slice(),
         hasArm2: false,
@@ -169,11 +182,15 @@
     }
     const parts = str.split(';');
     const rawNums = (parts[0] || '').split(',').map(Number);
-    const coords = defaultCoords.map((def, i) => Number.isFinite(rawNums[i]) ? rawNums[i] : def);
+    let coords = defaultCoords.map((def, i) => Number.isFinite(rawNums[i]) ? rawNums[i] : def);
+    // Selbstheilung falls Punkte zuvor in die Ecke (47,46) gerutscht waren
+    if (isCorruptedCornerCoords(coords)) {
+      coords = defaultCoords.slice();
+    }
     const sx = coords[2], sy = coords[3], px = coords[4], py = coords[5];
 
-    let hasArm2 = false, arm2 = [sx - 4, sy + 7, sx - 5, sy + 14];
-    let hasLeg2 = false, leg2 = [px - 3, py + 9, px - 3, py + 17];
+    let hasArm2 = false, arm2 = [Math.max(4, sx - 4), Math.min(44, sy + 7), Math.max(4, sx - 5), Math.min(44, sy + 14)];
+    let hasLeg2 = false, leg2 = [Math.max(4, px - 3), Math.min(44, py + 9), Math.max(4, px - 3), Math.min(44, py + 17)];
     const props = [];
 
     (parts[1] || '').split('M').filter(Boolean).forEach(sub => {
@@ -227,8 +244,8 @@
   }
 
   window.v3InterpolateFig = function (strA, strB, t) {
-    if (!strA || strA.startsWith('BR')) return strA || '';
-    if (!strB || strB.startsWith('BR')) return strA;
+    if (!strA || strA.startsWith('BR') || strA.startsWith('MD_')) return strA || '';
+    if (!strB || strB.startsWith('BR') || strB.startsWith('MD_')) return strA;
     const a = parseFigString(strA);
     const b = parseFigString(strB);
     const ease = 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, t)));
@@ -273,7 +290,7 @@
         const e = exId === '__admin_draft__' ? window.v3AdminDraftEx : ex(exId);
         if (!e) return;
         const frames = getExerciseKeyframes(e);
-        if (!frames.length || frames[0].startsWith('BR')) return;
+        if (!frames.length || frames[0].startsWith('BR') || frames[0].startsWith('MD_')) return;
 
         let figStr = frames[0];
         let phaseLabel = 'Start';
@@ -346,7 +363,8 @@
     const midThumb = hasMid && !midStr.startsWith('BR')
       ? `<div class="fg" style="width:110px;height:110px">${figSvg(midStr, e)}<span class="mu fl">Übergang</span></div>`
       : '';
-    const morphPreview = (!e.br && Array.isArray(e.fig) && e.fig.length >= 2)
+    const isMorphable = !e.br && Array.isArray(e.fig) && e.fig.length >= 2 && !String(e.fig[0]).startsWith('MD_');
+    const morphPreview = isMorphable
       ? `<div class="fg v3-morph-box" data-exid="${esc(e.id)}" style="width:110px;height:110px;border-color:var(--ac)">
            <div class="v3-morph-svg" style="width:100%;height:100%">${figSvg(e.fig[0], e)}</div>
            <span class="mu fl v3-morph-lbl" style="color:var(--ac);font-weight:700">Ablauf</span>
@@ -399,7 +417,7 @@
           midEl.innerHTML = `${figSvg(midStr, e)}<span class="mu fl">Übergang</span>`;
           detailFigRow.children[0]?.after(midEl);
         }
-        if (!e.br && Array.isArray(e.fig) && e.fig.length >= 2) {
+        if (!e.br && Array.isArray(e.fig) && e.fig.length >= 2 && !String(e.fig[0]).startsWith('MD_')) {
           const morphEl = document.createElement('div');
           morphEl.className = 'fg v3-morph-box';
           morphEl.setAttribute('data-exid', e.id);
@@ -638,7 +656,9 @@
     return tpl.innerHTML;
   };
 
-  // --- 6. INTERAKTIVER ADMIN-EDITOR FÜR ÜBUNGEN & STRICHMÄNNCHEN ---
+  // =========================================================================
+  // 6. INTERAKTIVER ADMIN-EDITOR (FIX FÜR TOUCH/MOUSE DRAGGING & GLOBALS)
+  // =========================================================================
   const JOINT_META = [
     { idx: 0, key: 'head', label: 'Kopf', color: '#38bdf8' },
     { idx: 2, key: 'shoulder', label: 'Schulter', color: '#f59e0b' },
@@ -650,8 +670,7 @@
   ];
 
   function createEmptyAdminDraft() {
-    const nextNum = Math.max(131, ...EX.map(x => Number(String(x.id).replace(/\D/g, '')) || 0)) + 1;
-    const stdStanding = '24,7,24,13,24,27,24,36,24,44,24,20,24,27';
+    const nextNum = Math.max(131, ...EX.filter(x => !String(x.id).startsWith('m')).map(x => Number(String(x.id).replace(/\D/g, '')) || 0)) + 1;
     return {
       isNew: true,
       id: 'e' + nextNum,
@@ -674,9 +693,9 @@
       activePhase: 0,
       selectedJoint: 'knee1',
       frames: [
-        parseFigString(stdStanding),
-        parseFigString(stdStanding),
-        parseFigString('26,15,23,21,15,32,28,33,25,44,29,20,34,20')
+        parseFigString(STD_STANDING_FIG),
+        parseFigString(STD_STANDING_FIG),
+        parseFigString(STD_END_FIG)
       ],
       phases: [
         { label: 'Position 1 halten', sec: 20 },
@@ -688,9 +707,11 @@
   }
 
   let AD = createEmptyAdminDraft();
+  window.AD = AD;
   window.v3AdminDraftEx = null;
 
   function syncDraftToPreviewEx() {
+    window.AD = AD;
     const startStr = serializeFigData(AD.frames[0]);
     const midStr = serializeFigData(AD.frames[1]);
     const endStr = serializeFigData(AD.frames[2]);
@@ -721,6 +742,8 @@
   }
 
   window.v3AdminLoadExercise = function (id) {
+    S.ui.v3AdminOpen = true;
+    S.ui.settingsOpen.adminStudio = true;
     if (!id || id === '__new__') {
       AD = createEmptyAdminDraft();
       syncDraftToPreviewEx();
@@ -729,7 +752,7 @@
     }
     const existing = EX.find(x => x.id === id);
     if (!existing) return;
-    const f0 = existing.fig?.[0] || '24,7,24,13,24,27,24,36,24,44,24,20,24,27';
+    const f0 = existing.fig?.[0] || STD_STANDING_FIG;
     const f2 = existing.fig?.[1] || f0;
     const f1 = existing.figMid || existing.fig?.[2] || window.v3InterpolateFig(f0, f2, 0.5);
 
@@ -768,11 +791,73 @@
     render();
   };
 
+  // Globale Setter für Übungs-Typ & Ausführung (Fix für Punkt 2)
+  window.v3AdminSetExecMode = function (mode) {
+    if (!['reps', 'hold', 'sequence'].includes(mode)) return;
+    AD.execMode = mode;
+    S.ui.v3AdminOpen = true;
+    S.ui.settingsOpen.adminStudio = true;
+    syncDraftToPreviewEx();
+    const box = document.getElementById('v3AdminExecBox');
+    if (box) {
+      box.outerHTML = renderAdminExecBoxHtml();
+    } else {
+      render();
+    }
+  };
+
+  window.v3AdminSetUnilateral = function (checked) {
+    AD.unilateral = !!checked;
+    S.ui.v3AdminOpen = true;
+    S.ui.settingsOpen.adminStudio = true;
+    syncDraftToPreviewEx();
+  };
+
+  window.v3AdminUpdatePhase = function (idx, field, val) {
+    if (!AD.phases[idx]) return;
+    if (field === 'sec') AD.phases[idx].sec = Math.max(1, Number(val) || 10);
+    else AD.phases[idx].label = String(val || '');
+    syncDraftToPreviewEx();
+  };
+
+  window.v3AdminRemovePhaseRow = function (idx) {
+    AD.phases.splice(idx, 1);
+    syncDraftToPreviewEx();
+    const box = document.getElementById('v3AdminExecBox');
+    if (box) box.outerHTML = renderAdminExecBoxHtml();
+  };
+
+  window.v3AdminAddPhaseRow = function () {
+    AD.phases.push({ label: 'Stellung ' + (AD.phases.length + 1) + ' halten', sec: 20 });
+    syncDraftToPreviewEx();
+    const box = document.getElementById('v3AdminExecBox');
+    if (box) box.outerHTML = renderAdminExecBoxHtml();
+  };
+
+  window.v3AdminSelectJoint = function (jointKey) {
+    AD.selectedJoint = jointKey;
+    v3RefreshAdminStudioDOM(true);
+  };
+
+  window.v3AdminResetPose = function () {
+    AD.frames[AD.activePhase] = parseFigString(AD.activePhase === 2 ? STD_END_FIG : STD_STANDING_FIG);
+    syncDraftToPreviewEx();
+    v3RefreshAdminStudioDOM(true);
+    toast('🔄 Pose auf Standard-Stand zurückgesetzt');
+  };
+
   window.v3AdminSetPhase = function (pIdx) {
     AD.activePhase = pIdx;
     if (pIdx === 1) AD.hasMid = true;
     syncDraftToPreviewEx();
-    v3RefreshAdminStudioDOM();
+    // Aktualisiere Phasen-Tab-Buttons und Controls
+    [0, 1, 2].forEach(i => {
+      const btn = document.getElementById('v3AdmPhaseBtn_' + i);
+      if (btn) btn.classList.toggle('on', AD.activePhase === i);
+    });
+    const midCb = document.getElementById('v3AdmHasMidCb');
+    if (midCb) midCb.checked = AD.hasMid;
+    v3RefreshAdminStudioDOM(true);
   };
 
   window.v3AdminAutoMidpoint = function () {
@@ -781,18 +866,14 @@
     const midStr = window.v3InterpolateFig(startStr, endStr, 0.5);
     AD.frames[1] = parseFigString(midStr);
     AD.hasMid = true;
-    AD.activePhase = 1;
-    syncDraftToPreviewEx();
-    v3RefreshAdminStudioDOM();
+    window.v3AdminSetPhase(1);
     toast('✨ Übergangs-Position automatisch aus Start & Ende berechnet');
   };
 
   window.v3AdminCopyPhase = function (fromIdx, toIdx) {
     AD.frames[toIdx] = JSON.parse(JSON.stringify(AD.frames[fromIdx]));
     if (toIdx === 1) AD.hasMid = true;
-    AD.activePhase = toIdx;
-    syncDraftToPreviewEx();
-    v3RefreshAdminStudioDOM();
+    window.v3AdminSetPhase(toIdx);
     toast('Position kopiert');
   };
 
@@ -810,16 +891,16 @@
       fr.leg2[2] = Math.round((48 - fr.leg2[2]) * 10) / 10;
     }
     syncDraftToPreviewEx();
-    v3RefreshAdminStudioDOM();
+    v3RefreshAdminStudioDOM(true);
   };
 
   window.v3AdminToggleLimb2 = function (kind, enabled) {
     const fr = AD.frames[AD.activePhase];
-    if (kind === 'leg2') fr.hasLeg2 = enabled;
-    if (kind === 'arm2') fr.hasArm2 = enabled;
-    if (kind === 'dumbbell') fr.dumbbell = enabled;
+    if (kind === 'leg2') fr.hasLeg2 = !!enabled;
+    if (kind === 'arm2') fr.hasArm2 = !!enabled;
+    if (kind === 'dumbbell') fr.dumbbell = !!enabled;
     syncDraftToPreviewEx();
-    v3RefreshAdminStudioDOM();
+    v3RefreshAdminStudioDOM(true);
   };
 
   window.v3AdminAddPropPreset = function (presetKey) {
@@ -829,17 +910,16 @@
       fr.props = preset.path ? [preset.path] : [];
     });
     syncDraftToPreviewEx();
-    v3RefreshAdminStudioDOM();
+    v3RefreshAdminStudioDOM(true);
   };
 
-  window.v3AdminToggleRegion = function (regName, checked) {
+  window.v3AdminToggleRegion = function (regName) {
+    const isCurrentlyActive = REG[regName]?.test((AD.n || '') + ' ' + (AD.g || ''));
     const kw = REGION_KEYWORDS[regName] || regName;
     const firstWord = kw.split(',')[0].trim();
     let parts = (AD.g || '').split(',').map(s => s.trim()).filter(Boolean);
-    if (checked) {
-      if (!REG[regName]?.test(AD.n + ' ' + AD.g)) {
-        parts.push(firstWord);
-      }
+    if (!isCurrentlyActive) {
+      parts.push(firstWord);
     } else {
       parts = parts.filter(p => !REG[regName]?.test(p));
     }
@@ -847,8 +927,56 @@
     const gInp = document.getElementById('v3Adm_g');
     if (gInp) gInp.value = AD.g;
     syncDraftToPreviewEx();
-    v3RefreshAdminStudioDOM();
+    const regBox = document.getElementById('v3AdminRegionsBox');
+    if (regBox) regBox.outerHTML = renderAdminRegionsBoxHtml();
+    v3RefreshAdminStudioDOM(true);
   };
+
+  // Liefert alle aktuell aktiven Gelenke mit ihren Koordinaten für das aktuelle Frame
+  function getActiveJointList(fr) {
+    const list = JOINT_META.map(j => ({
+      key: j.key,
+      label: j.label,
+      color: j.color,
+      x: fr.coords[j.idx],
+      y: fr.coords[j.idx + 1],
+      dashed: false
+    }));
+    if (fr.hasLeg2) {
+      list.push({ key: 'knee2', label: 'Knie 2', color: '#14b8a6', x: fr.leg2[0], y: fr.leg2[1], dashed: true });
+      list.push({ key: 'foot2', label: 'Fuß 2', color: '#0d9488', x: fr.leg2[2], y: fr.leg2[3], dashed: true });
+    }
+    if (fr.hasArm2) {
+      list.push({ key: 'elbow2', label: 'Ellbogen 2', color: '#c084fc', x: fr.arm2[0], y: fr.arm2[1], dashed: true });
+      list.push({ key: 'hand2', label: 'Hand 2', color: '#f472b6', x: fr.arm2[2], y: fr.arm2[3], dashed: true });
+    }
+    return list;
+  }
+
+  function renderHandlesInnerSvg(fr) {
+    const joints = getActiveJointList(fr);
+    return joints.map(j => {
+      const isSel = AD.selectedJoint === j.key;
+      return `
+        <g class="v3-joint-handle" data-joint="${j.key}" style="cursor:grab">
+          ${isSel ? `<circle cx="${j.x}" cy="${j.y}" r="3.6" fill="none" stroke="${j.color}" stroke-width="0.7" opacity="0.85"/>` : ''}
+          <circle cx="${j.x}" cy="${j.y}" r="${isSel ? 2.3 : 1.8}" fill="${j.color}" stroke="#fff" stroke-width="0.55" ${j.dashed ? 'stroke-dasharray="1,0.5"' : ''}/>
+          <circle cx="${j.x}" cy="${j.y}" r="4.5" fill="transparent"/>
+        </g>`;
+    }).join('');
+  }
+
+  function renderJointChipsHtml(fr) {
+    const joints = getActiveJointList(fr);
+    return joints.map(j => `
+      <button type="button" class="chip ${AD.selectedJoint === j.key ? 'on' : ''}"
+        style="padding:4px 9px;font-size:11px;display:inline-flex;align-items:center;gap:4px"
+        onclick="v3AdminSelectJoint('${j.key}')">
+        <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${j.color}"></span>
+        ${esc(j.label)}
+      </button>
+    `).join('');
+  }
 
   function renderInteractiveEditorSvg() {
     const fr = AD.frames[AD.activePhase];
@@ -861,102 +989,152 @@
       gridLines += `<line x1="0" y1="${g}" x2="48" y2="${g}" stroke="var(--bd)" stroke-width="0.25" opacity="0.5"/>`;
     }
 
-    let handles = '';
-    JOINT_META.forEach(j => {
-      const cx = fr.coords[j.idx];
-      const cy = fr.coords[j.idx + 1];
-      const isSel = AD.selectedJoint === j.key;
-      handles += `
-        <g class="v3-joint-handle" data-joint="${j.key}" style="cursor:grab">
-          <circle cx="${cx}" cy="${cy}" r="${isSel ? 2.6 : 2.0}" fill="${j.color}" stroke="#fff" stroke-width="0.6"/>
-          <circle cx="${cx}" cy="${cy}" r="4.2" fill="transparent"/>
-        </g>`;
-    });
-
-    if (fr.hasLeg2) {
-      [['knee2', 0, '#14b8a6'], ['foot2', 2, '#0d9488']].forEach(([key, idx, col]) => {
-        const cx = fr.leg2[idx], cy = fr.leg2[idx + 1];
-        handles += `<g class="v3-joint-handle" data-joint="${key}" style="cursor:grab"><circle cx="${cx}" cy="${cy}" r="1.9" fill="${col}" stroke="#fff" stroke-width="0.5" stroke-dasharray="1,0.5"/><circle cx="${cx}" cy="${cy}" r="4" fill="transparent"/></g>`;
-      });
-    }
-
-    if (fr.hasArm2) {
-      [['elbow2', 0, '#c084fc'], ['hand2', 2, '#f472b6']].forEach(([key, idx, col]) => {
-        const cx = fr.arm2[idx], cy = fr.arm2[idx + 1];
-        handles += `<g class="v3-joint-handle" data-joint="${key}" style="cursor:grab"><circle cx="${cx}" cy="${cy}" r="1.9" fill="${col}" stroke="#fff" stroke-width="0.5" stroke-dasharray="1,0.5"/><circle cx="${cx}" cy="${cy}" r="4" fill="transparent"/></g>`;
-      });
-    }
-
     const innerFig = figSvg(curStr, draftEx).replace(/^<svg[^>]*>|<\/svg>$/g, '');
 
     return `
       <svg id="v3AdminSvgCanvas" class="v3-admin-svg" viewBox="0 0 48 48" width="240" height="240">
-        ${gridLines}
-        ${innerFig}
-        ${handles}
+        <g id="v3AdminGridLayer">${gridLines}</g>
+        <g id="v3AdminFigLayer">${innerFig}</g>
+        <g id="v3AdminHandlesLayer">${renderHandlesInnerSvg(fr)}</g>
       </svg>`;
   }
 
+  // WICHTIGER FIX (Punkt 1): Das <svg>-Element bleibt beim Ziehen komplett erhalten!
+  // Nur die inneren Layer (#v3AdminFigLayer und #v3AdminHandlesLayer) werden aktualisiert.
   function bindAdminCanvasPointerEvents() {
     const svg = document.getElementById('v3AdminSvgCanvas');
-    if (!svg) return;
-    let activeJoint = null;
+    if (!svg || svg.dataset.bound === '1') return;
+    svg.dataset.bound = '1';
+
+    let draggingJoint = null;
 
     const getSvgCoords = ev => {
       const rect = svg.getBoundingClientRect();
-      const x = Math.max(1, Math.min(47, Math.round(((ev.clientX - rect.left) / rect.width) * 48 * 2) / 2));
-      const y = Math.max(1, Math.min(46, Math.round(((ev.clientY - rect.top) / rect.height) * 48 * 2) / 2));
+      // Schutz gegen Division durch 0 oder verstecktes Canvas (verhindert das Springen auf 47,46!)
+      if (!rect || rect.width < 20 || rect.height < 20) return null;
+      const clientX = ev.clientX !== undefined ? ev.clientX : (ev.touches?.[0]?.clientX);
+      const clientY = ev.clientY !== undefined ? ev.clientY : (ev.touches?.[0]?.clientY);
+      if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
+
+      const rawX = ((clientX - rect.left) / rect.width) * 48;
+      const rawY = ((clientY - rect.top) / rect.height) * 48;
+      if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) return null;
+
+      const x = Math.max(2, Math.min(46, Math.round(rawX * 2) / 2));
+      const y = Math.max(2, Math.min(45, Math.round(rawY * 2) / 2));
       return [x, y];
     };
 
-    svg.onpointerdown = ev => {
-      const handle = ev.target.closest('.v3-joint-handle');
-      if (!handle) return;
-      ev.preventDefault();
-      activeJoint = handle.getAttribute('data-joint');
-      AD.selectedJoint = activeJoint;
-      try { svg.setPointerCapture(ev.pointerId); } catch (_) {}
-    };
-
-    svg.onpointermove = ev => {
-      if (!activeJoint) return;
-      ev.preventDefault();
-      const [x, y] = getSvgCoords(ev);
+    const applyJointPosition = (jointKey, x, y) => {
       const fr = AD.frames[AD.activePhase];
-      const mainMeta = JOINT_META.find(j => j.key === activeJoint);
+      const mainMeta = JOINT_META.find(j => j.key === jointKey);
       if (mainMeta) {
         fr.coords[mainMeta.idx] = x;
         fr.coords[mainMeta.idx + 1] = y;
-      } else if (activeJoint === 'knee2') {
+      } else if (jointKey === 'knee2') {
         fr.leg2[0] = x; fr.leg2[1] = y;
-      } else if (activeJoint === 'foot2') {
+      } else if (jointKey === 'foot2') {
         fr.leg2[2] = x; fr.leg2[3] = y;
-      } else if (activeJoint === 'elbow2') {
+      } else if (jointKey === 'elbow2') {
         fr.arm2[0] = x; fr.arm2[1] = y;
-      } else if (activeJoint === 'hand2') {
+      } else if (jointKey === 'hand2') {
         fr.arm2[2] = x; fr.arm2[3] = y;
       }
-      v3RefreshAdminStudioDOM();
     };
 
-    svg.onpointerup = svg.onpointercancel = () => {
-      activeJoint = null;
+    svg.addEventListener('pointerdown', ev => {
+      const pt = getSvgCoords(ev);
+      if (!pt) return;
+      ev.preventDefault();
+      const [x, y] = pt;
+      const fr = AD.frames[AD.activePhase];
+      const joints = getActiveJointList(fr);
+
+      // 1. Prüfe, ob ein Gelenk in der Nähe des Finger-/Mausklicks liegt (Radius 8 Einheiten im 48x48 Feld)
+      let bestKey = null;
+      let bestDist = 8.5;
+      joints.forEach(j => {
+        const d = Math.hypot(j.x - x, j.y - y);
+        // Falls zwei Gelenke aufeinander liegen, bevorzuge das bereits ausgewählte Gelenk
+        const bonus = j.key === AD.selectedJoint ? -0.4 : 0;
+        if (d + bonus < bestDist) {
+          bestDist = d + bonus;
+          bestKey = j.key;
+        }
+      });
+
+      // 2. Falls weiter weg geklickt wurde, bewege das aktuell über die Chips ausgewählte Gelenk dorthin!
+      draggingJoint = bestKey || AD.selectedJoint || 'knee1';
+      AD.selectedJoint = draggingJoint;
+
+      try { svg.setPointerCapture(ev.pointerId); } catch (_) {}
+      applyJointPosition(draggingJoint, x, y);
+      v3RefreshAdminStudioDOM(false);
+    }, { passive: false });
+
+    svg.addEventListener('pointermove', ev => {
+      if (!draggingJoint) return;
+      const pt = getSvgCoords(ev);
+      if (!pt) return;
+      ev.preventDefault();
+      const [x, y] = pt;
+      applyJointPosition(draggingJoint, x, y);
+      v3RefreshAdminStudioDOM(false);
+    }, { passive: false });
+
+    const endDrag = ev => {
+      if (!draggingJoint) return;
+      try {
+        if (ev && ev.pointerId !== undefined && svg.hasPointerCapture?.(ev.pointerId)) {
+          svg.releasePointerCapture(ev.pointerId);
+        }
+      } catch (_) {}
+      draggingJoint = null;
+      v3RefreshAdminStudioDOM(true);
     };
+
+    svg.addEventListener('pointerup', endDrag);
+    svg.addEventListener('pointercancel', endDrag);
   }
 
-  window.v3RefreshAdminStudioDOM = function () {
-    const canvasWrap = document.getElementById('v3AdminCanvasWrap');
-    const previewWrap = document.getElementById('v3AdminPreviewWrap');
-    const codeInp = document.getElementById('v3AdminFigCode');
-    if (canvasWrap) {
-      canvasWrap.innerHTML = renderInteractiveEditorSvg();
-      bindAdminCanvasPointerEvents();
+  window.v3RefreshAdminStudioDOM = function (updateChips = false) {
+    const fr = AD.frames[AD.activePhase];
+    const draftEx = syncDraftToPreviewEx();
+    const curStr = serializeFigData(fr);
+
+    const figLayer = document.getElementById('v3AdminFigLayer');
+    const handlesLayer = document.getElementById('v3AdminHandlesLayer');
+
+    if (figLayer && handlesLayer) {
+      figLayer.innerHTML = figSvg(curStr, draftEx).replace(/^<svg[^>]*>|<\/svg>$/g, '');
+      handlesLayer.innerHTML = renderHandlesInnerSvg(fr);
+    } else {
+      const canvasWrap = document.getElementById('v3AdminCanvasWrap');
+      if (canvasWrap) {
+        canvasWrap.innerHTML = renderInteractiveEditorSvg();
+        bindAdminCanvasPointerEvents();
+      }
     }
+
+    if (updateChips) {
+      const chipsWrap = document.getElementById('v3AdminJointChips');
+      if (chipsWrap) chipsWrap.innerHTML = renderJointChipsHtml(fr);
+      const limb2Wrap = document.getElementById('v3AdminLimbToggles');
+      if (limb2Wrap) {
+        limb2Wrap.innerHTML = `
+          <label class="chip" style="padding:5px 10px;font-size:12px"><input type="checkbox" ${fr.hasLeg2 ? 'checked' : ''} onchange="v3AdminToggleLimb2('leg2',this.checked)"> 🦵 2. Bein</label>
+          <label class="chip" style="padding:5px 10px;font-size:12px"><input type="checkbox" ${fr.hasArm2 ? 'checked' : ''} onchange="v3AdminToggleLimb2('arm2',this.checked)"> 💪 2. Arm</label>
+          <label class="chip" style="padding:5px 10px;font-size:12px"><input type="checkbox" ${fr.dumbbell ? 'checked' : ''} onchange="v3AdminToggleLimb2('dumbbell',this.checked)"> 🏋️ Hantel</label>`;
+      }
+    }
+
+    const previewWrap = document.getElementById('v3AdminPreviewWrap');
     if (previewWrap) {
       previewWrap.innerHTML = renderAdminLivePreviews();
     }
-    if (codeInp) {
-      codeInp.value = serializeFigData(AD.frames[AD.activePhase]);
+    const codeInp = document.getElementById('v3AdminFigCode');
+    if (codeInp && document.activeElement !== codeInp) {
+      codeInp.value = curStr;
     }
     startGlobalMorphLoop();
   };
@@ -969,20 +1147,70 @@
 
     return `
       <div class="r" style="gap:8px;justify-content:center">
-        <div class="fg" style="width:76px;height:76px;${AD.activePhase === 0 ? 'border:2px solid var(--ac)' : ''}" onclick="v3AdminSetPhase(0)">
+        <div class="fg" style="width:76px;height:76px;cursor:pointer;${AD.activePhase === 0 ? 'border:2px solid var(--ac)' : ''}" onclick="v3AdminSetPhase(0)">
           ${figSvg(s0, draftEx)}<span class="mu fl">Start</span>
         </div>
         ${AD.hasMid ? `
-        <div class="fg" style="width:76px;height:76px;${AD.activePhase === 1 ? 'border:2px solid var(--ac)' : ''}" onclick="v3AdminSetPhase(1)">
+        <div class="fg" style="width:76px;height:76px;cursor:pointer;${AD.activePhase === 1 ? 'border:2px solid var(--ac)' : ''}" onclick="v3AdminSetPhase(1)">
           ${figSvg(s1, draftEx)}<span class="mu fl">Übergang</span>
         </div>` : ''}
-        <div class="fg" style="width:76px;height:76px;${AD.activePhase === 2 ? 'border:2px solid var(--ac)' : ''}" onclick="v3AdminSetPhase(2)">
+        <div class="fg" style="width:76px;height:76px;cursor:pointer;${AD.activePhase === 2 ? 'border:2px solid var(--ac)' : ''}" onclick="v3AdminSetPhase(2)">
           ${figSvg(s2, draftEx)}<span class="mu fl">Ende</span>
         </div>
         <div class="fg v3-morph-box" data-exid="__admin_draft__" style="width:88px;height:88px;border:2px solid var(--mc)">
           <div class="v3-morph-svg" style="width:100%;height:100%">${figSvg(s0, draftEx)}</div>
           <span class="mu fl v3-morph-lbl" style="color:var(--mc);font-weight:700">Morph</span>
         </div>
+      </div>`;
+  }
+
+  function renderAdminRegionsBoxHtml() {
+    const activeRegions = Object.keys(REG).filter(r => REG[r].test((AD.n || '') + ' ' + (AD.g || '')));
+    return `
+      <div class="v3-admin-box" id="v3AdminRegionsBox">
+        <b>🔥 Beanspruchte Muskelpartien (färbt Körperteile automatisch ein)</b>
+        <div class="r" style="gap:6px;margin-top:6px">
+          ${Object.keys(REG).map(r => `
+            <button type="button" class="chip ${activeRegions.includes(r) ? 'on' : ''}" style="padding:5px 10px;font-size:12px" onclick="v3AdminToggleRegion('${r}')">
+              ${esc(r)}
+            </button>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+
+  function renderAdminExecBoxHtml() {
+    return `
+      <div class="v3-admin-box" id="v3AdminExecBox">
+        <b>⚙️ Übungs-Typ & Ausführung (steuert Timer & Info-Anzeige)</b>
+        <div class="r" style="gap:6px;margin-top:6px">
+          ${[
+            ['reps', '🔁 Wiederholungsübung (Wdh.)'],
+            ['hold', '⏱️ Halte-Übung (Statisch)'],
+            ['sequence', '📊 Abfolge-Übung (Mehrere Balken)']
+          ].map(([k, lbl]) => `
+            <button type="button" class="chip ${AD.execMode === k ? 'on' : ''}" style="flex:1;font-size:12px;padding:8px" onclick="v3AdminSetExecMode('${k}')">${lbl}</button>
+          `).join('')}
+        </div>
+
+        <label class="settingsRow" style="margin-top:10px;cursor:pointer">
+          <input type="checkbox" ${AD.unilateral ? 'checked' : ''} onchange="v3AdminSetUnilateral(this.checked)">
+          <span><b>↔️ Linke & Rechte Seite getrennt abhaken</b> (zeigt dem Nutzer L / R Buttons pro Satz)</span>
+        </label>
+
+        ${AD.execMode === 'sequence' ? `
+          <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bd)">
+            <b style="font-size:13px">📊 Phasen / Ablauf-Balken konfigurieren:</b>
+            ${AD.phases.map((ph, idx) => `
+              <div class="r" style="margin-top:6px;flex-wrap:nowrap">
+                <input placeholder="Stellung / Phase ${idx + 1}" value="${esc(ph.label)}" oninput="v3AdminUpdatePhase(${idx},'label',this.value)" style="flex:1">
+                <input type="number" min="1" max="600" value="${ph.sec}" oninput="v3AdminUpdatePhase(${idx},'sec',this.value)" style="width:74px" title="Sekunden">
+                <span class="mu" style="font-size:12px">s</span>
+                <button type="button" class="x" onclick="v3AdminRemovePhaseRow(${idx})">✕</button>
+              </div>
+            `).join('')}
+            <button type="button" class="chip" style="margin-top:6px;font-size:12px;padding:5px 10px" onclick="v3AdminAddPhaseRow()">+ Weitere Stellung / Balken hinzufügen</button>
+          </div>` : ''}
       </div>`;
   }
 
@@ -1047,11 +1275,6 @@
     toast(`📥 exercises.json (${official.length} Übungen) exportiert`);
   };
 
-  window.v3AdminAddPhaseRow = function () {
-    AD.phases.push({ label: 'Neue Stellung halten', sec: 15 });
-    render();
-  };
-
   window.v3AdminAddYtRow = function () {
     const urlInp = document.getElementById('v3AdmYtUrl');
     const titleInp = document.getElementById('v3AdmYtTitle');
@@ -1063,19 +1286,21 @@
     AD.ytList.push({ id: vid, t: titleInp?.value?.trim() || (AD.n || 'Übung') + ' Anleitung' });
     if (urlInp) urlInp.value = '';
     if (titleInp) titleInp.value = '';
+    S.ui.v3AdminOpen = true;
+    S.ui.settingsOpen.adminStudio = true;
     render();
   };
 
   function renderAdminStudioCard() {
     const fr = AD.frames[AD.activePhase];
-    const activeRegions = Object.keys(REG).filter(r => REG[r].test((AD.n || '') + ' ' + (AD.g || '')));
+    const isOpen = !!(S.ui.settingsOpen?.adminStudio || S.ui.v3AdminOpen);
 
     return `
-      <div class="c" id="v3AdminStudioCard">
-        <details ${S.ui.v3AdminOpen ? 'open' : ''} ontoggle="S.ui.v3AdminOpen=this.open;save()">
+      <div class="c" id="v3AdminStudioCard" data-setting-key="adminStudio">
+        <details ${isOpen ? 'open' : ''} ontoggle="S.ui.v3AdminOpen=this.open;d282ToggleSettings('adminStudio',this.open);if(this.open)setTimeout(()=>v3RefreshAdminStudioDOM(true),20)">
           <summary style="font-weight:700;cursor:pointer">🛠️ Admin: Übungskatalog-Studio (${EX.length} Übungen)</summary>
           <div style="margin-top:12px">
-            <p class="mu" style="font-size:13px;margin-top:0">Erstelle neue Übungen oder passe bestehende an. Positioniere das Strichmännchen per Drag & Drop an den Gelenken und exportiere anschließend die fertige <code>exercises.json</code>.</p>
+            <p class="mu" style="font-size:13px;margin-top:0">Erstelle neue Übungen oder passe bestehende an. Ziehe die Gelenke direkt im Feld oder wähle unten ein Gelenk aus und tippe auf die gewünschte Position.</p>
 
             <div class="r" style="gap:8px;margin-bottom:10px">
               <select style="flex:1" onchange="v3AdminLoadExercise(this.value)" aria-label="Übung zum Bearbeiten wählen">
@@ -1092,9 +1317,9 @@
               </div>
 
               <div class="r" style="gap:6px;margin-bottom:8px">
-                <button type="button" class="chip ${AD.activePhase === 0 ? 'on' : ''}" style="flex:1;padding:8px" onclick="v3AdminSetPhase(0)">1. Start</button>
-                <button type="button" class="chip ${AD.activePhase === 1 ? 'on' : ''}" style="flex:1;padding:8px" onclick="v3AdminSetPhase(1)">2. Übergang ${AD.hasMid ? '✓' : '(opt.)'}</button>
-                <button type="button" class="chip ${AD.activePhase === 2 ? 'on' : ''}" style="flex:1;padding:8px" onclick="v3AdminSetPhase(2)">3. Ende</button>
+                <button type="button" id="v3AdmPhaseBtn_0" class="chip ${AD.activePhase === 0 ? 'on' : ''}" style="flex:1;padding:8px" onclick="v3AdminSetPhase(0)">1. Start</button>
+                <button type="button" id="v3AdmPhaseBtn_1" class="chip ${AD.activePhase === 1 ? 'on' : ''}" style="flex:1;padding:8px" onclick="v3AdminSetPhase(1)">2. Übergang ${AD.hasMid ? '✓' : '(opt.)'}</button>
+                <button type="button" id="v3AdmPhaseBtn_2" class="chip ${AD.activePhase === 2 ? 'on' : ''}" style="flex:1;padding:8px" onclick="v3AdminSetPhase(2)">3. Ende</button>
               </div>
 
               <div class="v3-admin-editor-grid">
@@ -1103,12 +1328,14 @@
                 </div>
 
                 <div style="flex:1;min-width:210px">
-                  <div class="mu" style="font-size:12px;margin-bottom:6px">
-                    <b>Gelenke direkt mit Finger/Maus ziehen:</b><br>
-                    🔵 Kopf · 🟠 Schulter/Becken · 🟢 Knie/Fuß · 🟣 Ellbogen/Hand
+                  <div class="mu" style="font-size:12px;margin-bottom:4px">
+                    <b>Gelenk direkt ziehen oder hier antippen & im Feld platzieren:</b>
+                  </div>
+                  <div class="r" id="v3AdminJointChips" style="gap:4px;margin-bottom:8px">
+                    ${renderJointChipsHtml(fr)}
                   </div>
 
-                  <div class="r" style="gap:6px;margin-bottom:8px">
+                  <div class="r" id="v3AdminLimbToggles" style="gap:6px;margin-bottom:8px">
                     <label class="chip" style="padding:5px 10px;font-size:12px"><input type="checkbox" ${fr.hasLeg2 ? 'checked' : ''} onchange="v3AdminToggleLimb2('leg2',this.checked)"> 🦵 2. Bein</label>
                     <label class="chip" style="padding:5px 10px;font-size:12px"><input type="checkbox" ${fr.hasArm2 ? 'checked' : ''} onchange="v3AdminToggleLimb2('arm2',this.checked)"> 💪 2. Arm</label>
                     <label class="chip" style="padding:5px 10px;font-size:12px"><input type="checkbox" ${fr.dumbbell ? 'checked' : ''} onchange="v3AdminToggleLimb2('dumbbell',this.checked)"> 🏋️ Hantel</label>
@@ -1118,6 +1345,7 @@
                     <button type="button" class="chip" style="padding:5px 10px;font-size:12px" onclick="v3AdminAutoMidpoint()">✨ Übergang berechnen</button>
                     <button type="button" class="chip" style="padding:5px 10px;font-size:12px" onclick="v3AdminCopyPhase(0,2)">Start ➔ Ende</button>
                     <button type="button" class="chip" style="padding:5px 10px;font-size:12px" onclick="v3AdminFlipHorizontal()">↔️ Spiegeln</button>
+                    <button type="button" class="chip" style="padding:5px 10px;font-size:12px" onclick="v3AdminResetPose()">🔄 Pose Reset</button>
                   </div>
 
                   <label class="mu" style="font-size:12px">Hilfsmittel im Bild (Wand, Stuhl, Stufe, Keil)</label>
@@ -1126,7 +1354,7 @@
                     ${Object.entries(PROP_PRESETS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('')}
                   </select>
 
-                  <label class="mu" style="font-size:12px"><input type="checkbox" ${AD.hasMid ? 'checked' : ''} onchange="AD.hasMid=this.checked;v3RefreshAdminStudioDOM()"> Übergangs-Position im Übungsablauf speichern</label>
+                  <label class="mu" style="font-size:12px"><input id="v3AdmHasMidCb" type="checkbox" ${AD.hasMid ? 'checked' : ''} onchange="window.AD.hasMid=this.checked;v3RefreshAdminStudioDOM(false)"> Übergangs-Position im Übungsablauf speichern</label>
                 </div>
               </div>
 
@@ -1136,65 +1364,24 @@
               </div>
 
               <label class="mu" style="font-size:11px;margin-top:8px;display:block">Vektor-Code aktuelle Phase (kompatibel zu figSvg)
-                <input id="v3AdminFigCode" style="font-family:monospace;font-size:11px;padding:5px" value="${esc(serializeFigData(fr))}" onchange="AD.frames[AD.activePhase]=parseFigString(this.value);v3RefreshAdminStudioDOM()">
+                <input id="v3AdminFigCode" style="font-family:monospace;font-size:11px;padding:5px" value="${esc(serializeFigData(fr))}" onchange="window.v3AdminApplyRawFigCode(this.value)">
               </label>
             </div>
 
-            <div class="v3-admin-box">
-              <b>🔥 Beanspruchte Muskelpartien (färbt Körperteile automatisch ein)</b>
-              <div class="r" style="gap:6px;margin-top:6px">
-                ${Object.keys(REG).map(r => `
-                  <label class="chip ${activeRegions.includes(r) ? 'on' : ''}" style="padding:5px 10px;font-size:12px;cursor:pointer">
-                    <input type="checkbox" style="display:none" ${activeRegions.includes(r) ? 'checked' : ''} onchange="v3AdminToggleRegion('${r}',this.checked);render()">
-                    ${esc(r)}
-                  </label>
-                `).join('')}
-              </div>
-            </div>
-
-            <div class="v3-admin-box">
-              <b>⚙️ Übungs-Typ & Ausführung (steuert Timer & Info-Anzeige)</b>
-              <div class="r" style="gap:6px;margin-top:6px">
-                ${[
-                  ['reps', '🔁 Wiederholungsübung (Wdh.)'],
-                  ['hold', '⏱️ Halte-Übung (Statisch)'],
-                  ['sequence', '📊 Abfolge-Übung (Mehrere Balken)']
-                ].map(([k, lbl]) => `
-                  <button type="button" class="chip ${AD.execMode === k ? 'on' : ''}" style="flex:1;font-size:12px;padding:8px" onclick="AD.execMode='${k}';render()">${lbl}</button>
-                `).join('')}
-              </div>
-
-              <label class="settingsRow" style="margin-top:10px">
-                <input type="checkbox" ${AD.unilateral ? 'checked' : ''} onchange="AD.unilateral=this.checked;render()">
-                <span><b>↔️ Linke & Rechte Seite getrennt abhaken</b> (zeigt dem Nutzer L / R Buttons pro Satz)</span>
-              </label>
-
-              ${AD.execMode === 'sequence' ? `
-                <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bd)">
-                  <b style="font-size:13px">📊 Phasen / Ablauf-Balken konfigurieren:</b>
-                  ${AD.phases.map((ph, idx) => `
-                    <div class="r" style="margin-top:6px;flex-wrap:nowrap">
-                      <input placeholder="Stellung / Phase ${idx + 1}" value="${esc(ph.label)}" oninput="AD.phases[${idx}].label=this.value" style="flex:1">
-                      <input type="number" min="1" max="600" value="${ph.sec}" oninput="AD.phases[${idx}].sec=+this.value||10" style="width:74px" title="Sekunden">
-                      <span class="mu" style="font-size:12px">s</span>
-                      <button type="button" class="x" onclick="AD.phases.splice(${idx},1);render()">✕</button>
-                    </div>
-                  `).join('')}
-                  <button type="button" class="chip" style="margin-top:6px;font-size:12px;padding:5px 10px" onclick="v3AdminAddPhaseRow()">+ Weitere Stellung / Balken hinzufügen</button>
-                </div>` : ''}
-            </div>
+            ${renderAdminRegionsBoxHtml()}
+            ${renderAdminExecBoxHtml()}
 
             <div class="v3-admin-box">
               <b>📝 Text, Hashtags & Beispielvideos</b>
               <div class="r" style="margin-top:6px">
                 <div style="flex:2;min-width:160px">
                   <label class="mu" style="font-size:12px">Name der Übung *</label>
-                  <input value="${esc(AD.n)}" oninput="AD.n=this.value" placeholder="z. B. Bulgarische Kniebeuge">
+                  <input value="${esc(AD.n)}" oninput="window.AD.n=this.value" placeholder="z. B. Bulgarische Kniebeuge">
                 </div>
                 <div style="flex:1;min-width:130px">
                   <label class="mu" style="font-size:12px">Kategorie</label>
-                  <select onchange="AD.c=this.value">
-                    ${['Kraft', 'Rumpf', 'Gleichgewicht', 'Mobilisation', 'Dehnung', 'Schnelligkeit', 'Fitnessstudio', 'Atmen'].map(c => `<option ${AD.c === c ? 'selected' : ''}>${c}</option>`).join('')}
+                  <select onchange="window.AD.c=this.value">
+                    ${['Kraft', 'Rumpf', 'Gleichgewicht', 'Mobilisation', 'Dehnung', 'Schnelligkeit', 'Fitnessstudio', 'Atmen', 'Denkfehler', 'Alltags-Hürden', 'Mentales Training'].map(c => `<option value="${c}" ${AD.c === c ? 'selected' : ''}>${c}</option>`).join('')}
                   </select>
                 </div>
               </div>
@@ -1202,41 +1389,41 @@
               <div class="r" style="margin-top:6px">
                 <div style="flex:1;min-width:150px">
                   <label class="mu" style="font-size:12px">Aliasse (kommagetrennt)</label>
-                  <input value="${esc(AD.al.join(', '))}" oninput="AD.al=this.value.split(',').map(s=>s.trim()).filter(Boolean)" placeholder="z. B. Bulgarian Split Squat, BSS">
+                  <input value="${esc(AD.al.join(', '))}" oninput="window.AD.al=this.value.split(',').map(s=>s.trim()).filter(Boolean)" placeholder="z. B. Bulgarian Split Squat, BSS">
                 </div>
                 <div style="flex:1;min-width:130px">
                   <label class="mu" style="font-size:12px">Material / Gerät</label>
-                  <input value="${esc(AD.m)}" oninput="AD.m=this.value" placeholder="z. B. Bank, Kurzhanteln">
+                  <input value="${esc(AD.m)}" oninput="window.AD.m=this.value" placeholder="z. B. Bank, Kurzhanteln">
                 </div>
               </div>
 
               <label class="mu" style="font-size:12px;margin-top:6px;display:block">Hashtags (komma- oder leerzeichengetrennt, durchsuchbar)</label>
-              <input value="${esc(AD.tags.join(' '))}" oninput="AD.tags=this.value.split(/[\\s,]+/).map(s=>s.trim()).filter(Boolean).map(s=>s.startsWith('#')?s:'#'+s)" placeholder="#knie #reha #büro #beinkraft">
+              <input value="${esc(AD.tags.join(' '))}" oninput="window.AD.tags=this.value.split(/[\\s,]+/).map(s=>s.trim()).filter(Boolean).map(s=>s.startsWith('#')?s:'#'+s)" placeholder="#knie #reha #büro #beinkraft">
 
               <label class="mu" style="font-size:12px;margin-top:6px;display:block">Kurzbeschreibung</label>
-              <textarea rows="2" oninput="AD.d=this.value" placeholder="Wichtigste Ausführungshinweise...">${esc(AD.d)}</textarea>
+              <textarea rows="2" oninput="window.AD.d=this.value" placeholder="Wichtigste Ausführungshinweise...">${esc(AD.d)}</textarea>
 
               <div class="r" style="margin-top:6px">
-                <div style="flex:1"><label class="mu" style="font-size:12px">Startposition</label><input value="${esc(AD.s)}" oninput="AD.s=this.value"></div>
-                ${AD.hasMid ? `<div style="flex:1"><label class="mu" style="font-size:12px">Übergangsposition</label><input value="${esc(AD.mPos)}" oninput="AD.mPos=this.value"></div>` : ''}
-                <div style="flex:1"><label class="mu" style="font-size:12px">Endposition</label><input value="${esc(AD.e)}" oninput="AD.e=this.value"></div>
+                <div style="flex:1"><label class="mu" style="font-size:12px">Startposition</label><input value="${esc(AD.s)}" oninput="window.AD.s=this.value"></div>
+                <div style="flex:1"><label class="mu" style="font-size:12px">Übergangsposition (opt.)</label><input value="${esc(AD.mPos)}" oninput="window.AD.mPos=this.value"></div>
+                <div style="flex:1"><label class="mu" style="font-size:12px">Endposition</label><input value="${esc(AD.e)}" oninput="window.AD.e=this.value"></div>
               </div>
 
               <label class="mu" style="font-size:12px;margin-top:6px;display:block">Gut bei / Ziel (steuert auch Muskel-Färbung)</label>
-              <input id="v3Adm_g" value="${esc(AD.g)}" oninput="AD.g=this.value;v3RefreshAdminStudioDOM()">
+              <input id="v3Adm_g" value="${esc(AD.g)}" oninput="window.AD.g=this.value;v3RefreshAdminStudioDOM(false)">
 
               <label class="mu" style="font-size:12px;margin-top:6px;display:block">Eher nicht machen bei (Kontraindikationen)</label>
-              <input value="${esc(AD.x)}" oninput="AD.x=this.value">
+              <input value="${esc(AD.x)}" oninput="window.AD.x=this.value">
 
               <label class="mu" style="font-size:12px;margin-top:6px;display:block">Genauere Anleitung (optional)</label>
-              <textarea rows="2" oninput="AD.l=this.value">${esc(AD.l)}</textarea>
+              <textarea rows="2" oninput="window.AD.l=this.value">${esc(AD.l)}</textarea>
 
               <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bd)">
                 <b style="font-size:13px">🎬 YouTube-Beispielvideos (${AD.ytList.length})</b>
                 ${AD.ytList.map((v, i) => `
                   <div class="settingsRow" style="font-size:12px">
                     <span style="flex:1">▶ <b>${esc(v.t)}</b> (<code>${esc(v.id)}</code>)</span>
-                    <button type="button" class="x" onclick="AD.ytList.splice(${i},1);render()">✕</button>
+                    <button type="button" class="x" onclick="window.AD.ytList.splice(${i},1);render()">✕</button>
                   </div>
                 `).join('')}
                 <div class="r" style="margin-top:6px">
@@ -1256,14 +1443,138 @@
       </div>`;
   }
 
+  window.v3AdminApplyRawFigCode = function (val) {
+    AD.frames[AD.activePhase] = parseFigString(val);
+    syncDraftToPreviewEx();
+    v3RefreshAdminStudioDOM(true);
+  };
+
+  // =========================================================================
+  // 7. EINSTELLUNGEN STRUKTURIEREN (PUNKTE 3, 4, 5, 6)
+  // - Alle Punkte einklappbar (<details>)
+  // - Lokale Benachrichtigungen + Kalender-Erinnerung zusammengeführt
+  // - Pläne sichern + Verlauf sichern + Plan duplizieren + Plan Bild/Druck-Export zusammengeführt
+  // =========================================================================
+  function wrapCardAsCollapsible(cardEl, key, customSummaryTitle) {
+    if (!cardEl) return;
+    // Falls die Karte bereits ein Top-Level <details> hat, nur den State synchronisieren
+    const existingDetails = cardEl.querySelector(':scope > details');
+    if (existingDetails) {
+      if (S.ui.settingsOpen?.[key]) existingDetails.setAttribute('open', '');
+      else existingDetails.removeAttribute('open');
+      existingDetails.setAttribute('ontoggle', `d282ToggleSettings('${key}',this.open)`);
+      if (customSummaryTitle) {
+        const sum = existingDetails.querySelector(':scope > summary');
+        if (sum) sum.innerHTML = customSummaryTitle;
+      }
+      return;
+    }
+
+    const h3 = cardEl.querySelector(':scope > h3');
+    const titleHtml = customSummaryTitle || (h3 ? h3.innerHTML : 'Einstellung');
+    if (h3) h3.remove();
+    const inner = cardEl.innerHTML;
+    const isOpen = !!S.ui.settingsOpen?.[key];
+    cardEl.innerHTML = `
+      <details ${isOpen ? 'open' : ''} ontoggle="d282ToggleSettings('${key}',this.open)">
+        <summary style="font-weight:700;cursor:pointer">${titleHtml}</summary>
+        <div style="margin-top:12px">${inner}</div>
+      </details>`;
+  }
+
+  function buildPlanActionsForBackupCard() {
+    if (!S.plans || !S.plans.length) {
+      return `<p class="mu" style="font-size:13px;margin:8px 0">Noch keine eigenen Trainingspläne angelegt.</p>`;
+    }
+    return `
+      <div style="margin-top:10px">
+        <p class="mu" style="font-size:13px;margin:4px 0 8px">Einzelnen Plan duplizieren oder als Bild (PNG) bzw. Druck-Tabelle exportieren:</p>
+        ${S.plans.map(p => `
+          <div class="settingsRow" style="padding:6px 0;border-bottom:1px solid var(--bd)">
+            <b style="flex:1;min-width:130px">${esc(p.name)} <small class="mu">(${esc(getPlanLevel(p))})</small></b>
+            <button type="button" class="b g" style="padding:6px 10px;min-height:36px;font-size:12px" onclick="v3DuplicatePlan('${p.id}')">📋 Duplizieren</button>
+            <button type="button" class="b g" style="padding:6px 10px;min-height:36px;font-size:12px" onclick="v3OpenPlanExportModal('${p.id}')">📤 Bild / Tabelle</button>
+          </div>
+        `).join('')}
+      </div>`;
+  }
+
   const _prevVSetAdmin = vSet;
   vSet = function () {
     const html = _prevVSetAdmin();
     const tpl = document.createElement('template');
     tpl.innerHTML = html;
 
-    const cards = [...tpl.content.querySelectorAll('.c')];
-    const imprintCard = cards.find(c => /Impressum|Imprint|Datenschutz|Privacy/i.test(c.textContent || ''));
+    const allCards = [...tpl.content.querySelectorAll(':scope > .c')];
+
+    const findCard = regex => allCards.find(c => {
+      const heading = c.querySelector(':scope > h3, :scope > details > summary')?.textContent || '';
+      return regex.test(heading);
+    });
+
+    const getCardInnerBody = card => {
+      if (!card) return '';
+      const clone = card.cloneNode(true);
+      const det = clone.querySelector(':scope > details');
+      if (det) {
+        det.querySelector(':scope > summary')?.remove();
+        return det.innerHTML;
+      }
+      clone.querySelector(':scope > h3')?.remove();
+      return clone.innerHTML;
+    };
+
+    // --- PUNKT 6: Lokale Benachrichtigungen + Kalender-Erinnerung zusammenführen ---
+    const notifyCard = findCard(/Lokale Benachrichtigungen|Local notifications/i);
+    const calendarCard = findCard(/Kalender-Erinnerung|Calendar reminder/i);
+    if (notifyCard && calendarCard) {
+      const notifyBody = getCardInnerBody(notifyCard);
+      const calendarBody = getCardInnerBody(calendarCard);
+      notifyCard.innerHTML = `
+        <details ${S.ui.settingsOpen?.notifications ? 'open' : ''} ontoggle="d282ToggleSettings('notifications',this.open)">
+          <summary style="font-weight:700;cursor:pointer">🔔 Benachrichtigungen & Kalender-Erinnerung</summary>
+          <div style="margin-top:12px">
+            <h4 style="margin:0 0 6px">📱 Lokale App-Benachrichtigungen</h4>
+            ${notifyBody}
+            <hr style="border:0;border-top:1px solid var(--bd);margin:16px 0">
+            <h4 style="margin:0 0 6px">📅 Kalender-Eintrag (.ics Export & Google Kalender)</h4>
+            ${calendarBody}
+          </div>
+        </details>`;
+      calendarCard.remove();
+    } else if (notifyCard) {
+      wrapCardAsCollapsible(notifyCard, 'notifications', '🔔 Benachrichtigungen & Kalender-Erinnerung');
+    } else if (calendarCard) {
+      wrapCardAsCollapsible(calendarCard, 'notifications', '🔔 Benachrichtigungen & Kalender-Erinnerung');
+    }
+
+    // --- PUNKT 4 & 5: Pläne sichern + Verlauf sichern + Plan duplizieren + Bild/Tabelle Export zusammenführen ---
+    const plansBackupCard = findCard(/Pläne sichern|Backup plans/i);
+    const histBackupCard = findCard(/Verlauf sichern|Backup history/i);
+    if (plansBackupCard || histBackupCard) {
+      const targetCard = plansBackupCard || histBackupCard;
+      const plansBody = getCardInnerBody(plansBackupCard);
+      const histBody = getCardInnerBody(histBackupCard);
+      targetCard.innerHTML = `
+        <details ${S.ui.settingsOpen?.backupAll ? 'open' : ''} ontoggle="d282ToggleSettings('backupAll',this.open)">
+          <summary style="font-weight:700;cursor:pointer">💾 Pläne & Verlauf sichern / exportieren</summary>
+          <div style="margin-top:12px">
+            <h4 style="margin:0 0 6px">📋 Trainingspläne duplizieren & als Bild / Druck-Tabelle exportieren</h4>
+            ${buildPlanActionsForBackupCard()}
+            <hr style="border:0;border-top:1px solid var(--bd);margin:14px 0">
+            <h4 style="margin:0 0 6px">📦 Alle Pläne sichern & übertragen</h4>
+            ${plansBody}
+            <hr style="border:0;border-top:1px solid var(--bd);margin:14px 0">
+            <h4 style="margin:0 0 6px">📈 Trainingsverlauf sichern & importieren</h4>
+            ${histBody}
+          </div>
+        </details>`;
+      if (plansBackupCard && histBackupCard) histBackupCard.remove();
+    }
+
+    // --- Admin-Studio vor Datenschutz/Impressum einfügen ---
+    const remainingCards = [...tpl.content.querySelectorAll(':scope > .c')];
+    const imprintCard = remainingCards.find(c => /Impressum|Imprint|Datenschutz|Privacy/i.test(c.textContent || ''));
     const adminWrap = document.createElement('template');
     adminWrap.innerHTML = renderAdminStudioCard();
 
@@ -1273,6 +1584,23 @@
       tpl.content.appendChild(adminWrap.content.firstElementChild);
     }
 
+    // --- PUNKT 3: Alle übrigen Einstellungskarten einklappbar machen ---
+    const finalCards = [...tpl.content.querySelectorAll(':scope > .c')];
+    finalCards.forEach((card, idx) => {
+      if (card.querySelector(':scope > details')) return;
+      const headingText = (card.querySelector(':scope > h3')?.textContent || '').trim();
+      let key = 'sec_' + idx;
+      let customTitle = null;
+      if (/Darstellung|Appearance/i.test(headingText)) { key = 'appearance'; customTitle = '🎨 ' + headingText; }
+      else if (/Gewicht|BMI/i.test(headingText)) { key = 'weight'; customTitle = '⚖️ ' + headingText; }
+      else if (/^Training$|^Workout$/i.test(headingText)) { key = 'training'; customTitle = '🏋️ Training, Pause-Timer & Challenge'; }
+      else if (/Serien-Schutz|Joker/i.test(headingText)) { key = 'pauseJoker'; }
+      else if (/Widgets/i.test(headingText)) { key = 'widgets'; customTitle = '📱 ' + headingText; }
+      else if (/Datenschutz|Privacy/i.test(headingText)) { key = 'privacy'; customTitle = '🔒 Datenschutz & Impressum'; }
+      else if (/Übungskatalog & Online-Updates/i.test(headingText)) { key = 'catalogSync'; }
+      wrapCardAsCollapsible(card, key, customTitle);
+    });
+
     setTimeout(() => {
       bindAdminCanvasPointerEvents();
       startGlobalMorphLoop();
@@ -1281,30 +1609,7 @@
     return tpl.innerHTML;
   };
 
-  // --- 7. TRAININGSPLAN-EXPORT ALS BILD (PNG) & DRUCK-TABELLE ---
-  const _prevVPlansAdmin = vPlans;
-  vPlans = function () {
-    const html = _prevVPlansAdmin();
-    if (ed) return html;
-    const tpl = document.createElement('template');
-    tpl.innerHTML = html;
-
-    const shareBtns = tpl.content.querySelectorAll('button[onclick^="share(\'"]');
-    shareBtns.forEach(btn => {
-      const m = (btn.getAttribute('onclick') || '').match(/^share\('([^']+)'\)$/);
-      if (!m) return;
-      const pid = m[1];
-      const expBtn = document.createElement('button');
-      expBtn.type = 'button';
-      expBtn.className = 'b g';
-      expBtn.setAttribute('onclick', `v3OpenPlanExportModal('${pid}')`);
-      expBtn.innerHTML = '📤 Plan exportieren (Bild / Druck)';
-      btn.after(expBtn);
-    });
-
-    return tpl.innerHTML;
-  };
-
+  // --- 8. TRAININGSPLAN-EXPORT ALS BILD (PNG) & DRUCK-TABELLE ---
   function resolveSvgForCanvas(svgHtml) {
     const style = getComputedStyle(document.documentElement);
     const vars = {
@@ -1314,7 +1619,8 @@
       'var(--bb)': style.getPropertyValue('--bb').trim() || '#64748b',
       'var(--bd)': style.getPropertyValue('--bd').trim() || '#cbd5e1',
       'var(--mu)': style.getPropertyValue('--mu').trim() || '#64748b',
-      'var(--tx)': style.getPropertyValue('--tx').trim() || '#1e293b'
+      'var(--tx)': style.getPropertyValue('--tx').trim() || '#1e293b',
+      'var(--ok)': style.getPropertyValue('--ok').trim() || '#16a34a'
     };
     let out = svgHtml.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');
     Object.entries(vars).forEach(([k, v]) => {
@@ -1454,7 +1760,7 @@
 
     ctx.fillStyle = muCol;
     ctx.font = '12px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`Erstellt mit „Mein Training“ · Stand: ${new Date().toLocaleDateString('de-AT')}`, 28, height - 16);
+    ctx.fillText(`Erstellt mit „Bond · Body & Mind“ · Stand: ${new Date().toLocaleDateString('de-AT')}`, 28, height - 16);
 
     return canvas;
   }
