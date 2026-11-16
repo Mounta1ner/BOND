@@ -642,3 +642,71 @@ a{color:var(--ac)}.fg{display:flex;align-items:center;justify-content:center;pos
   border-color: var(--ac) !important;
   background: #201806 !important;
 }
+
+/* --- 6. Bond: Body & Mind Navigation, Mental-Drills & Reflexions-Logbuch (v3_mind.js) --- */
+.v3-domain-switch {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+.v3-domain-switch .chip {
+  flex: 1;
+  text-align: center;
+  font-weight: 700;
+  padding: 10px 12px;
+}
+.v3-mind-cta-box {
+  margin: 8px 0 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--ac2), var(--card));
+  border: 1px solid var(--ac);
+}
+.v3-mind-step-card {
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  text-align: left;
+}
+.v3-mind-quote {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--mc);
+  background: var(--card);
+  border-radius: 0 10px 10px 0;
+  font-style: italic;
+  font-size: 14px;
+}
+.v3-mind-question {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--ac);
+  background: var(--card);
+  border-radius: 0 10px 10px 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+.v3-mind-target {
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--ok);
+  background: var(--card);
+  border-radius: 0 10px 10px 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+.v3-journal-entry {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--bd);
+}
+.v3-journal-entry:last-child {
+  border-bottom: 0;
+}
+:root[data-palette="gold"][data-mode="dark"] .v3-mind-step-card,
+:root[data-theme="dark-gold"] .v3-mind-step-card,
+:root[data-palette="gold"][data-mode="dark"] .v3-mind-cta-box,
+:root[data-theme="dark-gold"] .v3-mind-cta-box {
+  background: #000 !important;
+  border-color: #856526 !important;
+}
