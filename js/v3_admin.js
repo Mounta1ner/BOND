@@ -1760,7 +1760,7 @@
 
     ctx.fillStyle = muCol;
     ctx.font = '12px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`Erstellt mit „Bond · Body & Mind“ · Stand: ${new Date().toLocaleDateString('de-AT')}`, 28, height - 16);
+    ctx.fillText(`Erstellt mit „BOND – Body & Mind Training“ · Stand: ${new Date().toLocaleDateString('de-AT')}`, 28, height - 16);
 
     return canvas;
   }

@@ -23,7 +23,9 @@
     'v3_progression',
     'v3_ux',
     'v3_admin',
-    'v3_mind'
+    'v3_mind_data',
+    'v3_mind',
+    'v3_widget_bridge'
   ];
 
   function normalizeBaseUrl(url) {
@@ -346,6 +348,12 @@
       plans: initialData[1],
       translations: initialData[2]
     };
+    try {
+      const tStr = JSON.stringify(window.FITNESS_CATALOG.translations || {})
+        .replace(/MEIN TRAINING/g, 'BOND')
+        .replace(/Mein Training/g, 'BOND');
+      window.FITNESS_CATALOG.translations = JSON.parse(tStr);
+    } catch (_) {}
 
     for (const file of modules) {
       await new Promise((resolve, reject) => {
