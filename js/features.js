@@ -1,6 +1,6 @@
 // v2 feature module, data preserved in trainingsplan-v1
 S.ui=S.ui||{};S.palette=S.palette||(S.theme==='dark-gold'?'gold':'petrol');S.mode=S.mode||(S.theme==='dark-gold'?'dark':S.theme==='light'?'light':S.theme==='dark'?'dark':'auto');S.weights=S.weights||[];
-S.homeOrder=S.homeOrder||['plans','activities','bpm','weight','breath'];S.homeVisible=S.homeVisible||{};
+S.homeOrder=S.homeOrder||['plans','mindImpulse','activities','bpm','weight','breath'];if(!S.homeOrder.includes('mindImpulse')){const pi=S.homeOrder.indexOf('plans');S.homeOrder.splice(pi>=0?pi+1:0,0,'mindImpulse');}S.homeVisible=S.homeVisible||{};
 S.habits.forEach(h=>{h.mode=h.mode||(h.targetDays&&h.targetDays.length?'days':'any');h.weeklyTarget=h.weeklyTarget||3});
 S.plans.forEach(p=>{p.name=p.name.replace(/\s*\(Anfänger\)/g,'')});
 // Fix missing progressive overload helper in original supplied index
@@ -49,7 +49,7 @@ vSet=function(){
  // Remove previous theme card entirely. All choices now live in this one card.
  const themeStart=h.indexOf('<div class="c">');const themeEnd=h.indexOf('</div>',themeStart);
  if(themeStart>=0&&themeEnd>themeStart){const box=document.createElement('template');box.innerHTML=h;const first=box.content.querySelector('.c');if(first)first.remove();h=box.innerHTML}
- const keys={plans:'Heute & Trainingsplan',activities:'Aktivitäten & Routinen',weight:'Gewicht erfassen',bpm:'BPM Metronom',breath:'Atemübungen',finance:'Make me feel it'};
+ const keys={plans:'Heute & Trainingsplan',mindImpulse:'Mind-Impuls & Gewohnheits-Reminder',activities:'Aktivitäten & Routinen',weight:'Gewicht erfassen',bpm:'BPM Metronom',breath:'Atemübungen',finance:'Make me feel it'};
  const order=[...new Set([...(S.homeOrder||[]),...Object.keys(keys)])];S.homeOrder=order;
  const rows=order.map((k,i)=>`<div class="settingsRow"><input aria-label="${keys[k]||k} anzeigen" type="checkbox" ${S.homeVisible?.[k]===false?'':'checked'} onchange="S.homeVisible['${k}']=this.checked;save();render()"><b style="flex:1">${keys[k]||k}</b><button class="chip" onclick="moveHome(${i},-1)" aria-label="Hoch">↑</button><button class="chip" onclick="moveHome(${i},1)" aria-label="Runter">↓</button></div>`).join('');
  return `<h2>Einstellungen</h2><div class="c"><h3>Darstellung</h3><div class="r">${[['auto','🌓 Auto'],['light','☀️ Hell'],['dark','🌙 Dunkel']].map(([k,v])=>`<button class="chip ${S.mode===k?'on':''}" onclick="setMode('${k}')">${v}</button>`).join('')}</div><h3 style="margin-top:14px">Farbschema</h3><div class="r">${[['petrol','Petrol'],['gold','Schwarz/Gold'],['orange','Weiß/Orange']].map(([k,v])=>`<button class="chip ${S.palette===k?'on':''}" onclick="setPalette('${k}')">${v}</button>`).join('')}</div></div><div class="c"><h3>Persönliche Daten</h3><label>Körpergröße (cm)<input id="bodyHeight" type="number" min="80" max="240" step="1" value="${S.height||''}" onchange="setHeight(this.value)"></label><p class="mu">Wird für die BMI-Berechnung im Gewichtsverlauf verwendet.</p></div><div class="c"><h3>Home konfigurieren</h3><p class="mu">Jeder Bereich kann ein- oder ausgeblendet und verschoben werden.</p>${rows}</div><div class="c"><h3>Android Widgets</h3><p class="mu">Aktivität für jedes 1×1 Widget direkt beim Hinzufügen auswählen. Für ein anderes Widget dieselbe Kachel erneut hinzufügen.</p></div>`+h.replace(/^<h2>Einstellungen<\/h2>/,'');

@@ -657,10 +657,10 @@
       ov.innerHTML = `
         <div class="v3-player-wrap" style="text-align:center;padding-top:40px">
           <div style="font-size:56px">🏆</div>
-          <h2>Workout abgeschlossen!</h2>
-          <p class="mu">${esc(p.name)} · Alle ${totalSteps} Sätze für heute erledigt.</p>
+          <h2>${S.lang === 'en' ? 'Workout complete!' : 'Workout abgeschlossen!'}</h2>
+          <p class="mu">${esc(p.name)} · ${S.lang === 'en' ? `All ${totalSteps} sets completed for today.` : `Alle ${totalSteps} Sätze für heute erledigt.`}</p>
           <div class="bar" style="margin:16px 0"><i style="width:100%"></i></div>
-          <button type="button" class="b" style="width:100%;margin-top:16px" onclick="v3ClosePlayer()">✓ Zurück zur Übersicht</button>
+          <button type="button" class="b" style="width:100%;margin-top:16px" onclick="v3ClosePlayer()">${S.lang === 'en' ? '✓ Back to overview' : '✓ Zurück zur Übersicht'}</button>
         </div>`;
       return;
     }
@@ -677,13 +677,13 @@
       ov.innerHTML = `
         <div class="v3-player-wrap">
           <div class="r" style="justify-content:space-between;flex-wrap:nowrap">
-            <b>⏳ Satzpause · ${esc(p.name)}</b>
+            <b>⏳ ${S.lang === 'en' ? 'Rest timer' : 'Satzpause'} · ${esc(p.name)}</b>
             <button type="button" class="x" onclick="v3ClosePlayer()" aria-label="Schließen">✕</button>
           </div>
           <div class="bar" style="margin:8px 0"><i style="width:${pct}%"></i></div>
 
           <div class="c v3-rest-box">
-            <div class="mu" style="font-size:13px">Durchatmen & lockern</div>
+            <div class="mu" style="font-size:13px">${S.lang === 'en' ? 'Breathe & loosen up' : 'Durchatmen & lockern'}</div>
             <div class="v3-rest-countdown" id="v3RestTime">${remSec} s</div>
             <div class="v3-shrink-bar-wrap">
               <div class="v3-shrink-bar" id="v3RestBar" style="width:100%"></div>
@@ -691,7 +691,7 @@
             <div class="r" style="justify-content:center;gap:10px;margin-top:14px">
               <button type="button" class="chip" onclick="v3AdjustPlayerRest(-15)">−15 s</button>
               <button type="button" class="chip" onclick="v3AdjustPlayerRest(15)">+15 s</button>
-              <button type="button" class="b" onclick="v3SkipPlayerRest()">⏭️ Pause überspringen</button>
+              <button type="button" class="b" onclick="v3SkipPlayerRest()">${S.lang === 'en' ? '⏭️ Skip rest' : '⏭️ Pause überspringen'}</button>
             </div>
           </div>
 
@@ -732,8 +732,8 @@
 
         <!-- Modus-Umschalter: Standard vs. Zirkel/Supersatz -->
         <div class="v3-mode-switch">
-          <button type="button" class="chip ${WP.mode === 'standard' ? 'on' : ''}" onclick="v3SetPlayerMode('standard')">📋 Standard (Satz für Satz)</button>
-          <button type="button" class="chip ${WP.mode === 'circuit' ? 'on' : ''}" onclick="v3SetPlayerMode('circuit')">🔄 Zirkel / Supersatz</button>
+          <button type="button" class="chip ${WP.mode === 'standard' ? 'on' : ''}" onclick="v3SetPlayerMode('standard')">${S.lang === 'en' ? '📋 Standard (set by set)' : '📋 Standard (Satz für Satz)'}</button>
+          <button type="button" class="chip ${WP.mode === 'circuit' ? 'on' : ''}" onclick="v3SetPlayerMode('circuit')">${S.lang === 'en' ? '🔄 Circuit / Superset' : '🔄 Zirkel / Supersatz'}</button>
         </div>
 
         <!-- Hauptkarte der aktuellen Übung -->
@@ -790,15 +790,15 @@
 
           <!-- Haupt-Abschluss-Button -->
           <button type="button" class="b v3-player-complete-btn" onclick="v3CompletePlayerSet()">
-            ✓ Satz ${step.setNum} abschließen ${S.v27?.restOn !== false ? `(${S.v27?.restSeconds || 45}s Pause)` : ''}
+            ✓ ${S.lang === 'en' ? `Complete set ${step.setNum}` : `Satz ${step.setNum} abschließen`} ${S.v27?.restOn !== false ? `(${S.v27?.restSeconds || 45}s ${S.lang === 'en' ? 'rest' : 'Pause'})` : ''}
           </button>
         </div>
 
         <!-- Fußzeile: Vor/Zurück Navigation & Vorschau -->
         <div class="r" style="justify-content:space-between;margin-top:8px">
-          <button type="button" class="chip" ${WP.cursor <= 0 ? 'disabled style="opacity:.4"' : ''} onclick="v3PlayerNav(-1)">← Vorheriger Satz</button>
-          <span class="mu" style="font-size:12px">Schritt ${WP.cursor + 1} / ${totalSteps}</span>
-          <button type="button" class="chip" ${WP.cursor >= totalSteps - 1 ? 'disabled style="opacity:.4"' : ''} onclick="v3PlayerNav(1)">Nächster Satz →</button>
+          <button type="button" class="chip" ${WP.cursor <= 0 ? 'disabled style="opacity:.4"' : ''} onclick="v3PlayerNav(-1)">${S.lang === 'en' ? '← Previous set' : '← Vorheriger Satz'}</button>
+          <span class="mu" style="font-size:12px">${S.lang === 'en' ? 'Step' : 'Schritt'} ${WP.cursor + 1} / ${totalSteps}</span>
+          <button type="button" class="chip" ${WP.cursor >= totalSteps - 1 ? 'disabled style="opacity:.4"' : ''} onclick="v3PlayerNav(1)">${S.lang === 'en' ? 'Next set →' : 'Nächster Satz →'}</button>
         </div>
 
         ${nextEx ? `<div class="mu" style="text-align:center;font-size:12px;margin-top:8px">Danach: <b>${esc(nextEx.n)}</b> (Satz ${nextStep.setNum}/${nextStep.totalSets})</div>` : ''}
@@ -841,7 +841,7 @@
       startBtn.type = 'button';
       startBtn.className = 'b v3-start-workout-btn';
       startBtn.setAttribute('onclick', `v3OpenPlayer('${pid}')`);
-      startBtn.innerHTML = '▶ Workout starten';
+      startBtn.innerHTML = S.lang === 'en' ? '▶ Start workout' : '▶ Workout starten';
       levelRow.appendChild(startBtn);
     });
 

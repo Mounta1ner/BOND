@@ -46,7 +46,7 @@ window.d282Mode=x=>{S.ui.d282Mode=x;save();render()};window.d282Activities=x=>{S
 window.d282Day=d=>{const w=workoutEvents().filter(x=>x.date===d),a=habitEvents().filter(x=>x.date===d);
  const rows=[...w.map(x=>`${esc(x.name)} · ${x.unit==='reps'?x.reps+' Wdh.':x.unit==='seconds'?x.seconds+' Sek.':'1 Einheit'}`),...a.map(x=>`${esc(x.name)} · ${x.type==='done'?'Erledigt':'Ausgelassen'}`)];
  v27Modal(`<h2>${new Date(d+'T12:00:00').toLocaleDateString('de-AT')}</h2>${rows.map(x=>`<div class="settingsRow">${x}</div>`).join('')||'<p>Keine Einträge</p>'}`);};
-function activitiesCard(){const events=habitEvents();return `<div class="c"><h3>⚡ Aktivitäten</h3>${S.habits.map(h=>{const rows=events.filter(x=>x.habitId===h.id).sort((a,b)=>b.at.localeCompare(a.at));const moneyTotal=S.financeLedger.filter(x=>x.targetId===h.id&&x.category==='Aktivität').reduce((s,x)=>s+x.cents,0)/100;
+function activitiesCard(){const events=habitEvents();return `<div class="c"><h3>⚡ Aktivitäten</h3>${S.habits.map(h=>{const rows=events.filter(x=>x.habitId===h.id).sort((a,b)=>b.at.localeCompare(a.at));const led=(typeof activeLedger==='function'?activeLedger():S.financeLedger);const moneyTotal=led.filter(x=>String(x.targetId)===String(h.id)&&x.category==='Aktivität').reduce((s,x)=>s+(Number(x.cents)||0),0)/100;
  return `<details><summary>${esc(h.name)} · ${rows.filter(x=>x.type==='done').length}× · ${money(moneyTotal)}</summary>${activityBarChart(h.id)}<div class="fin-list">${rows.slice(0,30).map(x=>`<div class="settingsRow">${new Date(x.at).toLocaleString('de-AT')} · ${x.type==='done'?'Erledigt':'Ausgelassen'}</div>`).join('')||'<p>Keine Einträge</p>'}</div></details>`}).join('')||'<p>Keine Aktivitäten</p>'}</div>`;}
 const oldHistory=vHist;
 vHist=function(){const s=dashboardStats();const legacy=oldHistory();
@@ -103,11 +103,12 @@ vSet=function(){
  const plans=take(/Pläne sichern|Backup plans/i);
  const historyBackup=take(/Verlauf sichern|Backup history/i);
  const widgets=take(/Native Android Widgets?/i);
- const finance=take(/Make me feel it/i);
+ const financeCards=cards.filter(c=>/Make me feel it/i.test(c.querySelector(':scope > h3')?.textContent||''));financeCards.forEach(c=>used.add(c));const finance=financeCards.find(c=>c.id==='v3MakeMeFeelItSettingsCard'||c.innerHTML.includes('finance281Set'))||financeCards[financeCards.length-1];
  const weightWidget=document.createElement('template');weightWidget.innerHTML=weightQuick();
  const weightEntry=weightWidget.content.querySelector('.c');
  // Exactly one Home controller: reuse existing saved order, visibility and moveHome.
- const homeLabels={plans:'Trainingspläne',activities:'Aktivitäten & Routinen',favorites:'Favoriten',pause:'Pause-Timer',quote:'Motivationsspruch',weight:'Gewicht',bpm:'BPM',breath:'Atemübungen',challenge:'Challenge',streak:'Streaks',finance:'Make me feel it'};
+ if(!Array.isArray(S.homeOrder))S.homeOrder=['plans','mindImpulse','activities','bpm','weight','breath','finance'];if(!S.homeOrder.includes('mindImpulse')){const pi=S.homeOrder.indexOf('plans');S.homeOrder.splice(pi>=0?pi+1:0,0,'mindImpulse');}
+ const homeLabels={plans:'Trainingspläne',mindImpulse:'Mind-Impuls & Gewohnheits-Reminder',activities:'Aktivitäten & Routinen',favorites:'Favoriten',pause:'Pause-Timer',quote:'Motivationsspruch',weight:'Gewicht',bpm:'BPM',breath:'Atemübungen',challenge:'Challenge',streak:'Streaks',finance:'Make me feel it'};
  const homeRows=(S.homeOrder||[]).map((k,i)=>`<div class="settingsRow"><label style="flex:1"><input type="checkbox" ${S.homeVisible?.[k]===false?'':'checked'} onchange="S.homeVisible['${k}']=this.checked;save();render()"> ${homeLabels[k]||esc(k)}</label><button class="chip" onclick="moveHome(${i},-1)">↑</button><button class="chip" onclick="moveHome(${i},1)">↓</button></div>`).join('');
  const historyRows=d282HistoryOrder().map((k,i)=>`<div class="settingsRow"><label style="flex:1"><input type="checkbox" ${S.ui.historyVisible?.[k]===false?'':'checked'} onchange="d282ToggleHistory('${k}',this.checked)"> ${d282SectionLabels[k]}</label><button class="chip" onclick="d282MoveHistory(${i},-1)">↑</button><button class="chip" onclick="d282MoveHistory(${i},1)">↓</button></div>`).join('');
  const result=[

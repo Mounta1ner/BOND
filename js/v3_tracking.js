@@ -11,10 +11,10 @@
   S.ui.v3ChartMetric = S.ui.v3ChartMetric || 'maxKg';
 
   const RPE_LABELS = {
-    1: '🟢 Zu leicht',
-    2: '🟡 Genau richtig',
-    3: '🟠 Sehr anstrengend',
-    4: '🔴 Beschwerden'
+    1: S.lang === 'en' ? '🟢 Too easy' : '🟢 Zu leicht',
+    2: S.lang === 'en' ? '🟡 Just right' : '🟡 Genau richtig',
+    3: S.lang === 'en' ? '🟠 Very hard' : '🟠 Sehr anstrengend',
+    4: S.lang === 'en' ? '🔴 Discomfort' : '🔴 Beschwerden'
   };
 
   // Hilfsfunktionen für Einheiten & Default-Werte
@@ -206,7 +206,7 @@
       }
     }
     save();
-    toast('Werte von Satz 1 für heute auf alle Sätze übertragen');
+    toast(S.lang === 'en' ? 'Copied set 1 values to all sets for today' : 'Werte von Satz 1 für heute auf alle Sätze übertragen');
     render();
   };
 
@@ -216,7 +216,7 @@
     const first = window.v3GetSetTarget(dt, pid, idx, 1);
     p.items[idx].kg = +first.kg || 0;
     save();
-    toast('Arbeitsgewicht (' + p.items[idx].kg + ' kg) als Plan-Standard gespeichert');
+    toast(S.lang === 'en' ? 'Working weight (' + p.items[idx].kg + ' kg) saved as plan default' : 'Arbeitsgewicht (' + p.items[idx].kg + ' kg) als Plan-Standard gespeichert');
     render();
   };
 
@@ -266,7 +266,7 @@
             dateLabel,
             summary,
             rpeText,
-            text: `Letztes Mal (${dateLabel}): ${summary}${rpeText}`
+            text: `${S.lang === 'en' ? 'Last time' : 'Letztes Mal'} (${dateLabel}): ${summary}${rpeText}`
           };
         }
       }
@@ -289,7 +289,7 @@
         dateLabel,
         summary,
         rpeText: '',
-        text: `Letztes Mal (${dateLabel}): ${summary}`
+        text: `${S.lang === 'en' ? 'Last time' : 'Letztes Mal'} (${dateLabel}): ${summary}`
       };
     }
 
@@ -312,7 +312,7 @@
               dateLabel,
               summary,
               rpeText,
-              text: `Letztes Mal (${dateLabel}): ${summary}${rpeText}`
+              text: `${S.lang === 'en' ? 'Last time' : 'Letztes Mal'} (${dateLabel}): ${summary}${rpeText}`
             };
           }
         }
@@ -361,15 +361,22 @@
     return `
       <div class="v3-set-editor">
         <div class="r" style="justify-content:space-between;margin-bottom:6px">
-          <b style="font-size:13px">Satz-Werte für heute (${esc(e.n)})</b>
-          <span class="mu" style="font-size:11px">Plan-Basis bleibt geschützt</span>
+          <b style="font-size:13px">${S.lang === 'en' ? 'Set values for today' : 'Satz-Werte für heute'} (${esc(e.n)})</b>
+          <span class="mu" style="font-size:11px">${S.lang === 'en' ? 'Plan baseline stays protected' : 'Plan-Basis bleibt geschützt'}</span>
         </div>
         ${rows}
         <div class="r" style="margin-top:8px;justify-content:space-between">
-          <button type="button" class="chip" style="font-size:12px;padding:6px 10px" onclick="v3ApplyFirstSetToAll('${dt}','${p.id}',${idx})">↕ Satz 1 auf alle</button>
-          ${showKg ? `<button type="button" class="chip" style="font-size:12px;padding:6px 10px" onclick="v3SaveSetAsPlanDefault('${dt}','${p.id}',${idx})">💾 kg als Plan-Standard</button>` : ''}
+          <button type="button" class="chip" style="font-size:12px;padding:6px 10px" onclick="v3ApplyFirstSetToAll('${dt}','${p.id}',${idx})">${S.lang === 'en' ? '↕ Copy set 1 to all' : '↕ Satz 1 auf alle'}</button>
+          ${showKg ? `<button type="button" class="chip" style="font-size:12px;padding:6px 10px" onclick="v3SaveSetAsPlanDefault('${dt}','${p.id}',${idx})">${S.lang === 'en' ? '💾 Save kg as plan default' : '💾 kg als Plan-Standard'}</button>` : ''}
         </div>
       </div>`;
+  }
+
+
+  // Sicherstellen, dass v27.js weder trackHabit noch Make me feel it überschreibt
+  if (typeof window.v3MasterTrackHabit === 'function') {
+    window.trackHabit = window.v3MasterTrackHabit;
+    trackHabit = window.v3MasterTrackHabit;
   }
 
   const _prevVToday = vToday;
@@ -434,7 +441,7 @@
         editBtn.type = 'button';
         editBtn.className = 'chip v3-edit-btn' + (isOpen ? ' on' : '');
         editBtn.setAttribute('onclick', `v3ToggleSetEditor('${dt}','${pid}',${idx})`);
-        editBtn.innerHTML = '✎ Satz-Werte';
+        editBtn.innerHTML = S.lang === 'en' ? '✎ Set values' : '✎ Satz-Werte';
         actionRow.appendChild(editBtn);
       }
 
@@ -449,6 +456,19 @@
         }
       }
     });
+
+    // Make me feel it Kachel auf Home immer mit aktuellem Ledger synchronisieren
+    if (typeof window.financeHome === 'function') {
+      const existingFin = tpl.content.querySelector('section[data-module="finance"]');
+      if (S.homeVisible?.finance === false || !S.financeEnabled) {
+        if (existingFin) existingFin.remove();
+      } else {
+        const finHtml = window.financeHome();
+        if (existingFin && finHtml) {
+          existingFin.innerHTML = finHtml;
+        }
+      }
+    }
 
     return tpl.innerHTML;
   };
@@ -532,8 +552,8 @@
     const tracked = getTrackedExercisesForChart();
     if (!tracked.length) {
       return `<div class="c" data-v3-section="strengthChart">
-        <h3>📈 Kraft- & Leistungsverlauf</h3>
-        <p class="mu">Sobald du Sätze in einem Trainingsplan abhakst, erscheint hier deine Kraft-, 1RM- und Volumenkurve pro Übung.</p>
+        <h3>📈 ${S.lang === 'en' ? 'Strength & performance progress' : 'Kraft- & Leistungsverlauf'}</h3>
+        <p class="mu">${S.lang === 'en' ? 'Once you complete sets in a workout plan, your strength, 1RM, and volume curve per exercise will appear here.' : 'Sobald du Sätze in einem Trainingsplan abhakst, erscheint hier deine Kraft-, 1RM- und Volumenkurve pro Übung.'}</p>
       </div>`;
     }
 
@@ -547,10 +567,10 @@
     }
 
     const metricMeta = {
-      maxKg: { label: 'Max. Gewicht', unit: 'kg' },
-      e1rm: { label: 'Geschätztes 1RM', unit: 'kg' },
-      volume: { label: selected.hasWeight ? 'Volumen (kg×Wdh.)' : 'Gesamt-Volumen', unit: selected.hasWeight ? 'kg' : selected.unit },
-      totalReps: { label: 'Summe ' + selected.unit, unit: selected.unit }
+      maxKg: { label: S.lang === 'en' ? 'Max weight' : 'Max. Gewicht', unit: 'kg' },
+      e1rm: { label: S.lang === 'en' ? 'Estimated 1RM' : 'Geschätztes 1RM', unit: 'kg' },
+      volume: { label: selected.hasWeight ? (S.lang === 'en' ? 'Volume (kg×reps)' : 'Volumen (kg×Wdh.)') : (S.lang === 'en' ? 'Total volume' : 'Gesamt-Volumen'), unit: selected.hasWeight ? 'kg' : selected.unit },
+      totalReps: { label: (S.lang === 'en' ? 'Total ' : 'Summe ') + selected.unit, unit: selected.unit }
     };
     const curMeta = metricMeta[metric] || metricMeta.maxKg;
     const ptsData = selected.series.slice(-30);
@@ -593,7 +613,7 @@
       : [['totalReps', 'Summe ' + selected.unit], ['volume', 'Volumen']];
 
     return `<div class="c" data-v3-section="strengthChart">
-      <h3>📈 Kraft- & Leistungsverlauf</h3>
+      <h3>📈 ${S.lang === 'en' ? 'Strength & performance progress' : 'Kraft- & Leistungsverlauf'}</h3>
       <div class="r" style="margin:8px 0">
         <select aria-label="Übung für Kraftverlauf wählen" onchange="v3SelectChartEx(this.value)">
           ${tracked.map(t => `<option value="${esc(t.id)}" ${t.id === selected.id ? 'selected' : ''}>${esc(t.name)} (${t.series.length} Einh.)</option>`).join('')}

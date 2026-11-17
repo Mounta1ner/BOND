@@ -7,7 +7,14 @@
   // --- 1. STATE INITIALISIERUNG ---
   S.ui = S.ui || {};
   S.ui.libDomain = S.ui.libDomain || 'body'; // 'body' | 'mind'
+  S.ui.planDomain = S.ui.planDomain || 'body'; // 'body' | 'mind'
   S.ui.mindView = S.ui.mindView || 'all';   // 'all' | 'drills' | 'modules'
+  S.homeVisible = S.homeVisible || {};
+  S.homeOrder = Array.isArray(S.homeOrder) ? S.homeOrder : ['plans', 'mindImpulse', 'activities', 'bpm', 'weight', 'breath', 'finance'];
+  if (!S.homeOrder.includes('mindImpulse')) {
+    const pIdx = S.homeOrder.indexOf('plans');
+    S.homeOrder.splice(pIdx >= 0 ? pIdx + 1 : 0, 0, 'mindImpulse');
+  }
   S.mindJournal = Array.isArray(S.mindJournal) ? S.mindJournal : [];
 
   S.mindState = S.mindState || {
@@ -1694,19 +1701,89 @@
       actionRow.appendChild(drillBtn);
     });
 
-    // 2. Zusatz-Kacheln auf Home einhängen (Gewohnheits-Anker & Tages-Reflexionsimpuls)
-    if (S.ui.homeVisible?.mindImpulse !== false) {
-      const mindHomeWrap = document.createElement('template');
-      mindHomeWrap.innerHTML = `<section class="home-module home-section" data-module="mindImpulse">${renderHomeMindCardsHtml()}</section>`;
-      const planSec = tpl.content.querySelector('section[data-module="plans"]');
-      if (planSec) planSec.after(...mindHomeWrap.content.children);
-      else tpl.content.prepend(...mindHomeWrap.content.children);
+    // 2. Zusatz-Kacheln auf Home einhängen (Gewohnheits-Anker & Tages-Reflexionsimpuls) – steuerbar über S.homeVisible & S.homeOrder
+    const showMindImpulse = S.homeVisible?.mindImpulse !== false && S.ui?.homeVisible?.mindImpulse !== false;
+    if (showMindImpulse) {
+      const order = Array.isArray(S.homeOrder) ? S.homeOrder : [];
+      const dst = order.indexOf('mindImpulse');
+      const mindSec = document.createElement('section');
+      mindSec.className = 'home-module home-section';
+      mindSec.setAttribute('data-module', 'mindImpulse');
+      mindSec.innerHTML = renderHomeMindCardsHtml();
+
+      const nodes = [...tpl.content.children];
+      const before = dst >= 0 ? nodes.find(x => x.dataset?.module && order.indexOf(x.dataset.module) > dst) : null;
+      if (before) {
+        before.before(mindSec);
+      } else {
+        const planSec = tpl.content.querySelector('section[data-module="plans"]');
+        const extras = tpl.content.querySelector('.home-extras');
+        if (planSec && dst <= order.indexOf('plans') + 1) planSec.after(mindSec);
+        else if (extras) extras.before(mindSec);
+        else tpl.content.appendChild(mindSec);
+      }
+    }
+
+    // Alle [data-module] Sektionen auf Home strikt nach S.homeOrder sortieren und Ausgeblendete entfernen
+    const order = Array.isArray(S.homeOrder) ? S.homeOrder : [];
+    const modSections = [...tpl.content.querySelectorAll(':scope > [data-module]')];
+    if (modSections.length > 1 && order.length > 0) {
+      modSections.forEach(sec => {
+        const k = sec.getAttribute('data-module');
+        if (S.homeVisible && S.homeVisible[k] === false) sec.remove();
+      });
+      const remaining = [...tpl.content.querySelectorAll(':scope > [data-module]')];
+      remaining.sort((a, b) => {
+        const ia = order.indexOf(a.getAttribute('data-module'));
+        const ib = order.indexOf(b.getAttribute('data-module'));
+        return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+      });
+      const firstRef = tpl.content.firstElementChild;
+      remaining.forEach(sec => {
+        const extras = tpl.content.querySelector(':scope > .home-extras');
+        if (extras) extras.before(sec);
+        else tpl.content.appendChild(sec);
+      });
     }
 
     return tpl.innerHTML;
   };
 
-  // --- 11. KURATIERTE & 21-30 TAGE GEWOHNHEITS-MIND-PLÄNE IN vPlans ---
+  if (typeof window.organizeHome === 'function') {
+    const _prevOrganizeHome = window.organizeHome;
+    window.organizeHome = function () {
+      _prevOrganizeHome();
+      const appEl = document.getElementById('app');
+      if (!appEl || tab !== 'today') return;
+      const order = Array.isArray(S.homeOrder) ? S.homeOrder : [];
+      const secs = [...appEl.querySelectorAll(':scope > [data-module]')];
+      secs.forEach(sec => {
+        const k = sec.getAttribute('data-module');
+        if (S.homeVisible && S.homeVisible[k] === false) sec.remove();
+      });
+      const rem = [...appEl.querySelectorAll(':scope > [data-module]')];
+      if (rem.length > 1 && order.length) {
+        rem.sort((a, b) => {
+          const ia = order.indexOf(a.getAttribute('data-module'));
+          const ib = order.indexOf(b.getAttribute('data-module'));
+          return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+        });
+        const extras = appEl.querySelector(':scope > .home-extras');
+        rem.forEach(sec => {
+          if (extras) extras.before(sec);
+          else appEl.appendChild(sec);
+        });
+      }
+    };
+  }
+
+  // --- 11. BODY / MIND UMSCHALTER UNTER „PLÄNE“ (vPlans) ---
+  window.v3SetPlanDomain = function (dom) {
+    S.ui.planDomain = dom === 'mind' ? 'mind' : 'body';
+    save();
+    render();
+  };
+
   window.v3AddMindPlanTemplate = function (idx) {
     const tpl = MIND_CURATED_PLANS[idx];
     if (!tpl) return;
@@ -1727,6 +1804,42 @@
   vPlans = function () {
     const html = _prevVPlansMind();
     if (ed) return html;
+
+    const planDom = S.ui.planDomain === 'mind' ? 'mind' : 'body';
+    const switchHtml = `
+      <div class="v3-domain-switch">
+        <button type="button" class="chip ${planDom === 'body' ? 'on' : ''}" onclick="v3SetPlanDomain('body')">💪 Body · Trainingspläne</button>
+        <button type="button" class="chip ${planDom === 'mind' ? 'on' : ''}" onclick="v3SetPlanDomain('mind')">🧠 Mind · Mental- & Gewohnheitspläne</button>
+      </div>`;
+
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+
+    // 1. Domain-Umschalter ganz oben auf der Pläne-Seite einfügen
+    const switchWrap = document.createElement('template');
+    switchWrap.innerHTML = switchHtml;
+    tpl.content.prepend(...switchWrap.content.children);
+
+    if (planDom === 'body') {
+      // Im Body-Modus bleiben "Meine Pläne" + "Kuratierte Trainingspläne" + "Weitere Trainingspläne" sichtbar
+      return tpl.innerHTML;
+    }
+
+    // Im Mind-Modus: Entferne die Body-Vorlagen ab "Kuratierte Trainingspläne" (bzw. "Weitere Trainingspläne" / "Liegestütz-Trainingsplan")
+    const children = [...tpl.content.children];
+    const curatedIdx = children.findIndex(el => el.tagName === 'H2' && /Kuratierte Trainingspläne|Curated workout plans/i.test(el.textContent || ''));
+    if (curatedIdx >= 0) {
+      for (let i = curatedIdx; i < children.length; i++) {
+        children[i].remove();
+      }
+    } else {
+      children.forEach(el => {
+        const txt = el.querySelector?.('h3')?.textContent || '';
+        if (/Weitere Trainingspläne|More workout plans|Liegestütz-Trainingsplan/i.test(txt)) {
+          el.remove();
+        }
+      });
+    }
 
     const latestEval = S.mindState.evaluations[0];
     const recIds = latestEval?.recommendedPlanIds || [];
@@ -1779,25 +1892,514 @@
         </div>
       `).join('')}`;
 
-    const tpl = document.createElement('template');
-    tpl.innerHTML = html;
-    const curatedHeading = [...tpl.content.querySelectorAll('h2')].find(h => /Kuratierte Trainingspläne/i.test(h.textContent || ''));
     const wrap = document.createElement('template');
     wrap.innerHTML = mindPlansHtml;
-
-    if (curatedHeading) curatedHeading.before(...wrap.content.children);
-    else tpl.content.appendChild(wrap.content);
+    tpl.content.appendChild(wrap.content);
 
     return tpl.innerHTML;
   };
 
-  if (typeof applyI18N === 'function') {
-    const _prevApplyI18NMind = applyI18N;
-    applyI18N = function () {
-      _prevApplyI18NMind();
-      nav();
-    };
+
+  // =========================================================================
+  // 12. VOLLSTÄNDIGE DE / EN ÜBERSETZUNGS-ENGINE (INKL. DYNAMISCHER MUSTER, MODALS & PLACEHOLDER)
+  // =========================================================================
+  const V3_STATIC_MAP = {
+    'Home': 'Home',
+    'Pläne': 'Plans',
+    'Übungen': 'Exercises',
+    'Verlauf': 'History',
+    'Dashboard': 'Dashboard',
+    'Einstellungen': 'Settings',
+    'Meine Pläne': 'My plans',
+    '+ Neuer Plan': '+ New plan',
+    'Neuer Plan': 'New plan',
+    'Plan bearbeiten': 'Edit plan',
+    'Plan importieren': 'Import plan',
+    'Plan teilen': 'Share plan',
+    'Pläne exportieren': 'Export plans',
+    'Pläne importieren': 'Import plans',
+    'Alle Pläne exportieren': 'Export all plans',
+    'Verlauf exportieren': 'Export history',
+    'Verlauf importieren': 'Import history',
+    'Verlauf & Statistiken': 'History & statistics',
+    'Kuratierte Trainingspläne': 'Curated workout plans',
+    'Weitere Trainingspläne': 'More workout plans',
+    'Liegestütz-Trainingsplan': 'Push-up workout plan',
+    'Übernehmen': 'Adopt plan',
+    '+ Hinzufügen': '+ Add',
+    '+ Mental-Plan übernehmen': '+ Adopt mental plan',
+    '+ Diesen Gewohnheits-Plan starten': '+ Start this habit plan',
+    '+ Gewohnheits-Plan starten': '+ Start habit plan',
+    'Aktivitäten & Routinen': 'Activities & routines',
+    'Aktivitäten & Gewohnheiten Verlauf': 'Activities & habits history',
+    'Aktivitäten, Zeitstempel & Historie': 'Activities, timestamps & history',
+    'Aktivitäten': 'Activities',
+    'Aktivitäten anzeigen': 'Show activities',
+    'Geplante Aktivitäten': 'Scheduled activities',
+    'Alle Aktivitäten und Übungen': 'All activities and exercises',
+    'Noch keine Aktivitäten angelegt': 'No activities created yet',
+    'Noch keine Aktivitäten angelegt.': 'No activities created yet.',
+    'Noch keine Aktivitäten angelegt. Lege unter „Home“ Aktivitäten an.': 'No activities yet. Create activities on the Home tab.',
+    'Neue Aktivität erstellen': 'Create new activity',
+    'Aktivität speichern': 'Save activity',
+    'Keine Aktivitäten': 'No activities',
+    'Keine Pläne': 'No plans',
+    'Keine Einträge': 'No entries',
+    'Noch keine Einträge': 'No entries yet',
+    'Noch keine Einträge mit Zeitstempel.': 'No timestamped entries yet.',
+    'Noch keine Pläne zugewiesen': 'No plans assigned yet',
+    'Noch keine Pläne zugewiesen.': 'No plans assigned yet.',
+    'Noch keine eigenen Trainingspläne angelegt.': 'No custom workout plans created yet.',
+    'Wähle einen der vorbereiteten Standardpläne (z. B. Büro-Fit, Bauch-Beine-Po, Läufer) oder erstelle deinen eigenen Plan.': 'Choose one of the curated starter plans (e.g. Office Fit, Core & Legs, Runner) or create your own plan.',
+    'Zu den Plänen & Vorlagen': 'Go to plans & templates',
+    'Abhaken': 'Complete',
+    'Noch einmal': 'Again',
+    '✓ Noch einmal': '✓ Again',
+    'Auslassen': 'Skip',
+    'Erledigt': 'Completed',
+    '✓ Erledigt': '✓ Completed',
+    '✗ Ausgelassen': '✗ Skipped',
+    'Verpasst': 'Missed',
+    'Bearbeiten': 'Edit',
+    'Teilen': 'Share',
+    'Speichern': 'Save',
+    '✓ Speichern': '✓ Save',
+    'Abbrechen': 'Cancel',
+    'Löschen': 'Delete',
+    'Wirklich löschen': 'Confirm delete',
+    'Schließen': 'Close',
+    '✕ Schließen': '✕ Close',
+    'Fertig': 'Done',
+    'Zurück': 'Back',
+    '← Zurück': '← Back',
+    'Importieren': 'Import',
+    'Start': 'Start',
+    '▶ Start': '▶ Start',
+    '▶ Starten': '▶ Start',
+    'Stopp': 'Stop',
+    'Pause': 'Pause',
+    '⏸ Pause': '⏸ Pause',
+    '▶ Weiter': '▶ Resume',
+    'Beenden': 'End',
+    '+ Neu': '+ New',
+    'Neu': 'New',
+    'Kompakt ▼': 'Compact ▼',
+    'Alle ▲': 'All ▲',
+    'Stufe': 'Level',
+    'Stufe:': 'Level:',
+    'Leistungsstufe': 'Intensity level',
+    'Pause-Timer:': 'Rest timer:',
+    'Pausentimer': 'Rest timer',
+    'Diese Woche': 'This week',
+    'Wochentage': 'Weekdays',
+    'Wochentage:': 'Weekdays:',
+    'Feste Wochentage': 'Fixed weekdays',
+    'Mal pro Woche': 'Times per week',
+    '× pro Woche': '× per week',
+    'Ziel pro Woche': 'Weekly target',
+    'Jederzeit, beliebig oft': 'Any time, unlimited',
+    'Rhythmus': 'Rhythm',
+    'Rhythmus:': 'Rhythm:',
+    'Ton': 'Sound',
+    'BPM · Metronom': 'BPM · Metronome',
+    'BPM Metronom': 'BPM metronome',
+    'Gewicht': 'Weight',
+    'Gewicht (kg)': 'Weight (kg)',
+    'Gewicht erfassen': 'Track weight',
+    'Gewichtsverlauf': 'Weight history',
+    'Verlauf →': 'History →',
+    'Nach zwei Einträgen erscheint der Verlauf.': 'Chart appears after two entries.',
+    'Atemübungen nach Zweck': 'Breathing exercises by purpose',
+    'Atemübungen': 'Breathing exercises',
+    'Entspannen': 'Relax',
+    'Fokussieren': 'Focus',
+    'Runterkommen': 'Wind down',
+    'Meine Favoriten (Schnellstart)': 'My favorites (Quick start)',
+    'Favoriten:': 'Favorites:',
+    'Favoriten': 'Favorites',
+    'Tippe in der Übungsliste bei einer Übung auf „☆ Als Favorit“, um sie hier für den Schnellstart abzulegen.': 'Tap "☆ Add favorite" on any exercise in the library to pin it here for quick access.',
+    'Absolviere einzelne Übungen direkt per Fingertipp (Zeit/Wdh):': 'Complete individual exercises with a single tap (time/reps):',
+    '✓ Tracken': '✓ Track',
+    '☆ Als Favorit': '☆ Add favorite',
+    '★ Favorit': '★ Favorite',
+    '▶ Atemübung starten': '▶ Start breathing exercise',
+    '▶ Wiederholungen': '▶ Repetitions',
+    '▲ Beschreibung einklappen': '▲ Collapse description',
+    'Beschreibung einklappen': 'Collapse description',
+    'Start:': 'Start:',
+    'Übergang:': 'Transition:',
+    'Übergang': 'Transition',
+    'Ende:': 'End:',
+    'Ende': 'End',
+    'Ablauf': 'Flow',
+    'Bewegung': 'Motion',
+    'Genauere Anleitung:': 'Detailed instructions:',
+    'Gut bei / Ziel:': 'Good for / Goal:',
+    'Eher nicht machen bei:': 'Avoid if:',
+    'Eher nicht bei:': 'Avoid if:',
+    'Allgemeine Hinweise, sie ersetzen keine Anweisung deiner Therapeutin, deines Therapeuten oder deines Arztes.': 'General guidance only; does not replace advice from your physical therapist or physician.',
+    'Hier abspielen': 'Play here',
+    'Startet das Video nicht, öffne es über den Link.': 'If the video does not start, open it via the link.',
+    '▶ Videos auf YouTube suchen': '▶ Search videos on YouTube',
+    'Zu Plan hinzufügen': 'Add to plan',
+    '+ Eigene Übung': '+ Custom exercise',
+    '+ Eigene Body-Übung': '+ Custom body exercise',
+    '🗑 Eigene Übung löschen': '🗑 Delete custom exercise',
+    'Nichts gefunden.': 'Nothing found.',
+    'Alle': 'All',
+    'Kraft': 'Strength',
+    'Rumpf': 'Core',
+    'Gleichgewicht': 'Balance',
+    'Mobilisation': 'Mobility',
+    'Dehnung': 'Stretching',
+    'Schnelligkeit': 'Speed',
+    'Fitnessstudio': 'Gym',
+    'Atmen': 'Breathing',
+    'Eigene': 'Custom',
+    'Denkfehler': 'Cognitive biases',
+    'Alltags-Hürden': 'Everyday hurdles',
+    'Mentales Training': 'Mental training',
+    'Wissens-Module': 'Knowledge modules',
+    'Beruhigung': 'Calming',
+    'Konzentration': 'Concentration',
+    'Energie': 'Energy',
+    'Schlaf': 'Sleep',
+    'Ausdauer': 'Endurance',
+    'Krafttraining': 'Strength training',
+    'Körperregion:': 'Body region:',
+    'Alle Regionen': 'All regions',
+    'Nacken': 'Neck',
+    'Schulter': 'Shoulder',
+    'Arm/Hand': 'Arm/Hand',
+    'Rücken': 'Back',
+    'Rumpf/Bauch': 'Core/Abs',
+    'Hüfte/Gesäß': 'Hip/Glutes',
+    'Knie/Oberschenkel': 'Knee/Thigh',
+    'Wade/Fuß': 'Calf/Foot',
+    'Ganzkörper': 'Full body',
+    'Anfänger': 'Beginner',
+    'Amateur': 'Intermediate',
+    'Fortgeschritten': 'Advanced',
+    'Intensiv': 'Intense',
+    'Intensiv L2': 'Intense L2',
+    'Intensiv L3': 'Intense L3',
+    'Intensiv L4': 'Intense L4',
+    'Body · Trainingspläne': 'Body · Workout plans',
+    'Mind · Mental- & Gewohnheitspläne': 'Mind · Mental & habit plans',
+    'Body · Körper-Übungen': 'Body · Physical exercises',
+    'Mind · Mentales Training & Klarheit': 'Mind · Mental training & clarity',
+    'Situations-Quick-Check': 'Situation quick check',
+    'Quick-Check': 'Quick check',
+    'Einstiegs-Check starten': 'Start initial check',
+    'Dein Mind-Impuls heute': 'Your Mind impulse today',
+    'Notieren': 'Save note',
+    'Reflexionsfrage:': 'Reflection question:',
+    'Heute:': 'Today:',
+    'Deep-Dive & Quiz öffnen': 'Open deep dive & quiz',
+    'Drill': 'Drill',
+    'Drill starten': 'Start drill',
+    'Passenden Drill starten': 'Start matching drill',
+    'Situations-Drill': 'Situation drill',
+    'Interaktiver Situations-Coach': 'Interactive situation coach',
+    'Deine Situation eingeben ➔ Analyse & Umbau ➔ Leitsatz & Timer': 'Enter situation ➔ Analyze & reframe ➔ Guiding sentence & timer',
+    'Kompakte Impulse mit ausklappbarer Theorie, Alltagsbeispielen, Selbst-Check & Quiz.': 'Compact insights with expandable theory, everyday examples, self-check & quiz.',
+    'Alle Reflexionen bleiben zu 100 % privat und lokal auf deinem Gerät gespeichert.': 'All reflections stay 100% private and stored locally on your device.',
+    'Noch keine Einträge – starte oben einen Drill oder notiere deinen Tages-Impuls.': 'No entries yet – start a drill above or save your daily impulse.',
+    'Auslöser/Frage:': 'Trigger/Question:',
+    'Prüfung:': 'Check:',
+    'Prüfung': 'Check',
+    'Leitsatz / Notiz:': 'Guiding sentence / Note:',
+    'Impuls': 'Trigger',
+    'Ziel': 'Target',
+    'Quiz gelöst': 'Quiz solved',
+    'Tage Serie': 'Day streak',
+    'Serie laut Plan': 'Plan streak',
+    'Beste Serie': 'Best streak',
+    'Ausgelassen': 'Skipped',
+    'Absolviert gesamt': 'Total completed',
+    'Gesamt absolviert': 'Total completed',
+    'Letzte 30 Tage': 'Last 30 days',
+    'Im letzten Monat': 'In the last month',
+    'Verpasste Trainings': 'Missed workouts',
+    'Letzte 14 Tage': 'Last 14 days',
+    'Trainingsentwicklung · letzte 14 Tage': 'Training progress · last 14 days',
+    'Trainingsentwicklung': 'Training progress',
+    'Wiederholungen': 'Repetitions',
+    'Orange: Übungen · Grün: positiv · Rot: negativ · Blau: neutral. Tag antippen für Details.': 'Orange: exercises · Green: positive · Red: negative · Blue: neutral. Tap a day for details.',
+    'Absolvierte Einzelübungen': 'Completed single exercises',
+    'Make me feel it · Verlauf': 'Make me feel it · History',
+    'Noch offen': 'Still open',
+    'Aktuell offen:': 'Currently open:',
+    'Details →': 'Details →',
+    'Aktivieren': 'Enable',
+    'Positiv – bei Auslassen buchen': 'Positive – book when skipped/missed',
+    'Negativ – bei Erledigt buchen': 'Negative – book when completed',
+    'Neutral – keine Buchung': 'Neutral – no booking',
+    'Als beglichen zurücksetzen': 'Mark as settled (reset to 0 €)',
+    'CSV exportieren': 'Export CSV',
+    'Alle Einträge als CSV exportieren': 'Export all entries as CSV',
+    'Buchungen': 'Bookings',
+    'Zeit': 'Date',
+    'Quelle': 'Source',
+    'Grund': 'Reason',
+    'Betrag': 'Amount',
+    'Spenden-Vorschläge': 'Donation suggestions',
+    'Entwickler unterstützen: Marvin Berger': 'Support developer: Marvin Berger',
+    'IBAN kopieren': 'Copy IBAN',
+    'Die Links führen zur jeweiligen Spendenorganisation. Es wird keine Überweisung automatisch gestartet.': 'Links open the respective charity website. No transfer is initiated automatically.',
+    'Darstellung & Sprache': 'Appearance & language',
+    'Darstellung & Design': 'Appearance & design',
+    'Darstellung': 'Appearance',
+    'Auto': 'Auto',
+    'Hell': 'Light',
+    'Dunkel': 'Dark',
+    'Schwarz / Gold': 'Black / Gold',
+    'Schwarz/Gold': 'Black/Gold',
+    'Weiß/Orange': 'White/Orange',
+    'Farbschema': 'Color scheme',
+    'Sprache / Language': 'Language',
+    'Home Reihung und Anzeige konfigurieren': 'Configure Home order and visibility',
+    'Verlauf Reihung und Anzeige konfigurieren': 'Configure Dashboard order and visibility',
+    'Home konfigurieren': 'Configure Home',
+    'Trainingspläne': 'Workout plans',
+    'Mind-Impuls & Gewohnheits-Reminder': 'Mind impulse & habit reminder',
+    'Pause-Timer': 'Rest timer',
+    'Motivationsspruch': 'Motivational quote',
+    'Challenge': 'Challenge',
+    'Streaks': 'Streaks',
+    'Erfolge': 'Achievements',
+    'Einzelübungen': 'Single exercises',
+    'Weitere Bereiche': 'Other sections',
+    'Zuletzt trainiert': 'Last workout',
+    'Aktivitäts-Heatmap (26/52 Wochen)': 'Activity heatmap (26/52 weeks)',
+    'Kraft- & Leistungsverlauf': 'Strength & performance progress',
+    'Benachrichtigungen & Kalender-Erinnerung': 'Notifications & calendar reminder',
+    'Lokale App-Benachrichtigungen': 'Local app notifications',
+    'Kalender-Eintrag (.ics Export & Google Kalender)': 'Calendar entry (.ics export & Google Calendar)',
+    'Pläne & Verlauf sichern / exportieren': 'Back up & export plans / history',
+    'Trainingspläne duplizieren & als Bild / Druck-Tabelle exportieren': 'Duplicate workout plans & export as image / print table',
+    'Alle Pläne sichern & übertragen': 'Back up & transfer all plans',
+    'Trainingsverlauf sichern & importieren': 'Back up & import workout history',
+    'Duplizieren': 'Duplicate',
+    'Bild / Tabelle': 'Image / Table',
+    'Gewicht eingeben – für BMI Berechnung': 'Enter weight – for BMI calculation',
+    'Persönliche Daten': 'Personal data',
+    'Körpergröße (cm)': 'Body height (cm)',
+    'Wird für die BMI-Berechnung im Gewichtsverlauf verwendet.': 'Used for BMI calculation in weight history.',
+    'Training, Pause-Timer & Challenge': 'Workout, rest timer & challenge',
+    'Serien-Schutz: Joker & Pausier-Modus': 'Streak protection: Jokers & pause mode',
+    'Pausier-Modus aktivieren (Krankheit / Urlaub / Verletzung)': 'Enable pause mode (illness / vacation / injury)',
+    'Pausiert bis (einschließlich)': 'Paused until (inclusive)',
+    'Pause-Zeitraum speichern': 'Save pause period',
+    'Aktivität nachbuchen': 'Backfill activity',
+    'Gestern nachbuchen': 'Backfill yesterday',
+    'Serie in Gefahr!': 'Streak at risk!',
+    'Serie geschützt 🛡️': 'Streak protected 🛡️',
+    'Pause jetzt beenden': 'End pause now',
+    'Übungskatalog & Online-Updates': 'Exercise catalog & online updates',
+    'Übungskatalog jetzt prüfen': 'Check exercise catalog now',
+    'Datenschutz & Impressum': 'Privacy & imprint',
+    'Wiederholungsübung': 'Repetition exercise',
+    'Halte-Übung (Statisch)': 'Hold exercise (Static)',
+    'Links / Rechts getrennt': 'Left / Right separate',
+    '30s Halte-Timer starten': 'Start 30s hold timer',
+    'Kästchen antippen für Tages-Details & Nachbuchen': 'Tap any square for day details & backfill'
+  };
+
+  const V3_PLACEHOLDER_MAP = {
+    'Suchen: Name, Beschwerde, #Hashtag oder Ziel (z. B. Squat, Knie, Rücken)': 'Search: name, issue, #hashtag or goal (e.g. squat, knee, back)',
+    'Suchen: Name, Beschwerde oder Ziel (z. B. Squat, Knie, Rücken, Balance)': 'Search: name, issue or goal (e.g. squat, knee, back, balance)',
+    'Suchen: Katastrophisieren, Nein sagen, Gespräch, 21 Uhr, #denkfehler...': 'Search: catastrophizing, saying no, conversation, 9pm, #bias...',
+    'Suchen (z. B. Squat, Plank, Brücke)': 'Search (e.g. squat, plank, bridge)',
+    'Kurzer Gedanke für dein Mental-Logbuch...': 'Short thought for your mental journal...',
+    'z. B. 2.5L Wasser trinken, 10 Min Physio, 7000 Schritte': 'e.g. Drink 2.5L water, 10 min physio, 7000 steps',
+    'z. B. Knie-Reha': 'e.g. Knee rehab',
+    'z. B. Erkältung, Urlaub': 'e.g. Cold, vacation',
+    'Code hier einfügen': 'Paste backup code here',
+    'Deine Gedanken / Gegenbeweise / nächster Schritt...': 'Your thoughts / counter-evidence / next step...'
+  };
+
+  const DAY_DE_TO_EN = { 'Mo': 'Mon', 'Di': 'Tue', 'Mi': 'Wed', 'Do': 'Thu', 'Fr': 'Fri', 'Sa': 'Sat', 'So': 'Sun' };
+
+  function translateDynamicPattern(str) {
+    let s = str;
+    // Home header: "Home, Di 17.11.2026"
+    s = s.replace(/^Home,\s*(Mo|Di|Mi|Do|Fr|Sa|So)\b/, (_, d) => `Home, ${DAY_DE_TO_EN[d] || d}`);
+    // Counts & progress
+    s = s.replace(/(\d+)\s+von\s+(\d+)\s+heute erledigt/g, '$1 of $2 completed today');
+    s = s.replace(/(\d+)\s+von\s+(\d+)\s+Einheiten/g, '$1 of $2 sessions');
+    s = s.replace(/(\d+)\s+von\s+(\d+)\s+Jokern frei/g, '$1 of $2 jokers left');
+    s = s.replace(/(\d+)\s+von\s+(\d+)/g, '$1 of $2');
+    s = s.replace(/(\d+)%\s+geschafft/g, '$1% completed');
+    s = s.replace(/✓\s*Fertig für heute/g, '✓ Done for today');
+    s = s.replace(/(\d+)\s+Übungen/g, '$1 exercises');
+    s = s.replace(/(\d+)×\s+pro Woche\s*\(flexibel\)/g, '$1× per week (flexible)');
+    s = s.replace(/(\d+)×\s+pro Woche/g, '$1× per week');
+    s = s.replace(/✓\s*(\d+)×\s*absolviert\s*·\s*✗\s*(\d+)×\s*ausgelassen/g, '✓ $1× completed · ✗ $2× skipped');
+    s = s.replace(/(\d+)×\s*erledigt/g, '$1× completed');
+    s = s.replace(/Letzter Wert:\s*/g, 'Last entry: ');
+    s = s.replace(/Letztes Mal\s*\(/g, 'Last time (');
+    s = s.replace(/Diese Woche:/g, 'This week:');
+    s = s.replace(/Wochenziel erreicht/g, 'Weekly goal reached');
+    s = s.replace(/·\s*noch\s+(\d+)/g, '· $1 left');
+    s = s.replace(/Für heute ist kein Training fällig\.\s*Du hast\s+(\d+)\s+aktive Pläne\./g, 'No workout due today. You have $1 active plans.');
+    s = s.replace(/Body\s*·\s*Körper\s*\((\d+)\)/g, 'Body ($1)');
+    s = s.replace(/Mind\s*·\s*Geist\s*\((\d+)\)/g, 'Mind ($1)');
+    s = s.replace(/Interaktive Praxis-Drills\s*\((\d+)\)/g, 'Interactive practice drills ($1)');
+    s = s.replace(/Wissens-\s*&\s*Deep-Dive-Module\s*\((\d+)\)/g, 'Knowledge & deep-dive modules ($1)');
+    s = s.replace(/Mein Mental-Logbuch\s*\((\d+)\s+Einträge\)/g, 'My mental journal ($1 entries)');
+    s = s.replace(/BOND\s*·\s*21–30 Tage Gewohnheits-Pläne\s*\(Mind\)/g, 'BOND · 21–30 Day Habit Plans (Mind)');
+    s = s.replace(/BOND\s*·\s*Fokus-\s*&\s*Alltags-Routinen\s*\(Mind\)/g, 'BOND · Focus & Everyday Routines (Mind)');
+    s = s.replace(/\+\s*(\d+)-Tage-Gewohnheit starten/g, '+ Start $1-day habit plan');
+    s = s.replace(/✓\s*Aktiv\s*\(Auf Home anzeigen\)/g, '✓ Active (Shown on Home)');
+    s = s.replace(/⭐\s*Für dich empfohlen/g, '⭐ Recommended for you');
+    s = s.replace(/(\d+)\s+Tage Aufbau\s*·\s*danach alle\s+(\d+)\s+Tage Auffrischung\s*·\s*Drills:/g, '$1 days build-up · then refresh every $2 days · Drills:');
+    s = s.replace(/Tag\s+(\d+)\/(\d+)\s*\((\d+)%\)/g, 'Day $1/$2 ($3%)');
+    s = s.replace(/Heutiger Drill:/g, "Today's drill:");
+    s = s.replace(/▶\s*Heutigen Mind-Drill starten/g, "▶ Start today's Mind drill");
+    s = s.replace(/✓\s*Heute erledigt\s*\(Nochmal üben\)/g, '✓ Done today (Practice again)');
+    s = s.replace(/Erlaubnissatz für Antreiber/g, 'Permission thought for driver');
+    s = s.replace(/Aktivitäts-Heatmap\s*\(Letzte\s+(\d+)\s+Wochen\)/g, 'Activity heatmap (Last $1 weeks)');
+    s = s.replace(/(\d+)\s+aktive Tage/g, '$1 active days');
+    s = s.replace(/(\d+)\/(\d+)\s+Joker frei/g, '$1/$2 jokers left');
+    s = s.replace(/(\d+)\s+Wo\./g, '$1 wks');
+    s = s.replace(/Zuletzt trainiert:/g, 'Last workout:');
+    s = s.replace(/Noch kein Training erfasst/g, 'No workout recorded yet');
+    s = s.replace(/(\d+)\s+Buchungen/g, '$1 bookings');
+    s = s.replace(/offen\s*·/g, 'open ·');
+    s = s.replace(/Satz\s+(\d+)\s+von\s+(\d+)/g, 'Set $1 of $2');
+    s = s.replace(/Runde\s+(\d+)\/(\d+)/g, 'Round $1/$2');
+    s = s.replace(/Schritt\s+(\d+)\s+von\s+(\d+)/g, 'Step $1 of $2');
+    s = s.replace(/Angesprochen:/g, 'Targeted:');
+    s = s.replace(/Beansprucht \(orange\):/g, 'Targeted muscles (orange):');
+    s = s.replace(/Auch bekannt als:/g, 'Also known as:');
+    s = s.replace(/Admin:\s*Übungskatalog-Studio\s*\((\d+)\s+Übungen\)/g, 'Admin: Exercise Catalog Studio ($1 exercises)');
+    return s;
   }
+
+  let _i18nBusy = false;
+
+  window.v3ApplyFullI18N = function (customRoot) {
+    document.documentElement.lang = S.lang === 'en' ? 'en' : 'de';
+    if (S.lang !== 'en' || _i18nBusy) return;
+    _i18nBusy = true;
+
+    try {
+      const catTrans = window.FITNESS_CATALOG?.translations;
+      const revCatalog = (catTrans && catTrans.de && catTrans.en)
+        ? Object.fromEntries(Object.entries(catTrans.de).map(([k, v]) => [v, catTrans.en[k]]))
+        : {};
+
+      const roots = customRoot
+        ? [customRoot]
+        : [
+            document.getElementById('app'),
+            document.getElementById('v27Overlay'),
+            document.getElementById('v3PlayerOv'),
+            document.getElementById('v3PhaseOv'),
+            document.getElementById('brov'),
+            document.getElementById('tmr')
+          ].filter(Boolean);
+
+      // 1. Zuerst alle <option>-Werte absichern, damit select.value bei Übersetzung des Option-Textes niemals seinen internen Wert verliert!
+      roots.forEach(rt => {
+        rt.querySelectorAll?.('option').forEach(opt => {
+          if (!opt.hasAttribute('value')) {
+            opt.setAttribute('value', (opt.textContent || '').trim());
+          }
+        });
+        // Übersetze placeholder, title & aria-label
+        rt.querySelectorAll?.('[placeholder],[title],[aria-label]').forEach(el => {
+          ['placeholder', 'title', 'aria-label'].forEach(attr => {
+            const val = el.getAttribute(attr);
+            if (!val) return;
+            if (V3_PLACEHOLDER_MAP[val]) {
+              el.setAttribute(attr, V3_PLACEHOLDER_MAP[val]);
+            } else if (V3_STATIC_MAP[val]) {
+              el.setAttribute(attr, V3_STATIC_MAP[val]);
+            }
+          });
+        });
+      });
+
+      // 2. Alle Textknoten übersetzen (inkl. Emoji-Prefix-Erhaltung & dynamischer Muster)
+      const emojiPrefixRegex = /^([\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}✓✗★☆▲▼▶⏸⏹⏭️🔄📋📤📥📦📱📲🗓️🛡️🃏⏸️▶️⚡🧠💪🏠📈⚖️🥁🌬️🌿🎯🌙🔒🛠️🎨🏋️🦵🔥🖨️🖼️💬🔴🟠🟡🟢🏆⏳ℹ️📓📖🧭🪜☑️✅❌💡📌💼🔍🗣️⭐]+\s*)/u;
+
+      roots.forEach(rt => {
+        const walker = document.createTreeWalker(rt, NodeFilter.SHOW_TEXT, null);
+        let node;
+        while ((node = walker.nextNode())) {
+          const parentTag = node.parentElement?.tagName;
+          if (parentTag === 'SCRIPT' || parentTag === 'STYLE' || parentTag === 'CODE' || parentTag === 'TEXTAREA') continue;
+
+          const raw = node.nodeValue;
+          if (!raw || !raw.trim()) continue;
+          const trimmed = raw.trim();
+
+          // A) Direkter Treffer in V3_STATIC_MAP oder translations.json
+          const direct = V3_STATIC_MAP[trimmed] || revCatalog[trimmed];
+          if (direct && direct !== trimmed) {
+            node.nodeValue = raw.replace(trimmed, direct);
+            continue;
+          }
+
+          // B) Treffer mit führendem Emoji/Symbol (z. B. "🎯 Aktivitäten & Routinen")
+          const emMatch = trimmed.match(emojiPrefixRegex);
+          if (emMatch) {
+            const prefix = emMatch[1];
+            const rest = trimmed.slice(prefix.length).trim();
+            const mappedRest = V3_STATIC_MAP[rest] || revCatalog[rest];
+            if (mappedRest && mappedRest !== rest) {
+              node.nodeValue = raw.replace(trimmed, prefix + mappedRest);
+              continue;
+            }
+          }
+
+          // C) Dynamische Muster (Zahlen, Daten, Fortschritt, Sätze)
+          const dyn = translateDynamicPattern(trimmed);
+          if (dyn !== trimmed) {
+            node.nodeValue = raw.replace(trimmed, dyn);
+          }
+        }
+      });
+    } finally {
+      _i18nBusy = false;
+    }
+  };
+
+  // Überschreibe applyI18N global, sodass alle Aufrufe die neue Voll-Engine nutzen
+  window.applyI18N = function () {
+    window.v3ApplyFullI18N();
+    nav();
+  };
+  applyI18N = window.applyI18N;
+
+  // Auch nach lib2() (Live-Suche) und v27Modal() automatisch übersetzen
+  const _prevLib2I18N = lib2;
+  lib2 = function () {
+    _prevLib2I18N.apply(this, arguments);
+    window.v3ApplyFullI18N();
+  };
+
+  if (typeof window.v27Modal === 'function') {
+    const _prevV27ModalI18N = window.v27Modal;
+    window.v27Modal = function () {
+      const res = _prevV27ModalI18N.apply(this, arguments);
+      window.v3ApplyFullI18N(document.getElementById('v27Overlay'));
+      return res;
+    };
+    v27Modal = window.v27Modal;
+  }
+
+  // MutationObserver für dynamisch nachgeladene Overlays (Workout-Player, Phasen-Timer, Atem-Overlay)
+  try {
+    const i18nObserver = new MutationObserver(() => {
+      if (S.lang === 'en' && !_i18nBusy) {
+        window.v3ApplyFullI18N();
+      }
+    });
+    i18nObserver.observe(document.body, { childList: true, subtree: true });
+  } catch (_) {}
 
 
   if (typeof render === 'function') {
@@ -1805,6 +2407,7 @@
     render = function () {
       const res = _prevRenderMindBrand.apply(this, arguments);
       applyBondBrandingEverywhere();
+      window.v3ApplyFullI18N();
       return res;
     };
   }

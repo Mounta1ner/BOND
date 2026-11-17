@@ -7,10 +7,10 @@
   S.ui.v3DeloadAck = S.ui.v3DeloadAck || {};
 
   const RPE_ITEMS = [
-    { rpe: 1, icon: '🟢', label: 'Zu leicht', sub: 'Deutlich Reserven übrig' },
-    { rpe: 2, icon: '🟡', label: 'Genau richtig', sub: 'Gute Trainingsbelastung' },
-    { rpe: 3, icon: '🟠', label: 'Sehr anstrengend', sub: 'Am Limit trainiert' },
-    { rpe: 4, icon: '🔴', label: 'Schmerz / Beschwerden', sub: 'Gelenk- oder Muskelbeschwerden' }
+    { rpe: 1, icon: '🟢', label: 'Zu leicht', labelEn: 'Too easy', sub: 'Deutlich Reserven übrig', subEn: 'Plenty of reserve left' },
+    { rpe: 2, icon: '🟡', label: 'Genau richtig', labelEn: 'Just right', sub: 'Gute Trainingsbelastung', subEn: 'Optimal training load' },
+    { rpe: 3, icon: '🟠', label: 'Sehr anstrengend', labelEn: 'Very hard', sub: 'Am Limit trainiert', subEn: 'Trained near limit' },
+    { rpe: 4, icon: '🔴', label: 'Schmerz / Beschwerden', labelEn: 'Pain / Discomfort', sub: 'Gelenk- oder Muskelbeschwerden', subEn: 'Joint or muscle discomfort' }
   ];
 
   function nowIsoTimestamp() {
@@ -90,15 +90,15 @@
     const currentRpe = S.workoutFeedback?.[dt]?.[pid]?.rpe || 0;
     return `
       <div class="v3-rpe-box">
-        <div class="v3-rpe-title">Wie hat sich das Training heute angefühlt?</div>
+        <div class="v3-rpe-title">${S.lang === 'en' ? 'How did the workout feel today?' : 'Wie hat sich das Training heute angefühlt?'}</div>
         <div class="v3-rpe-grid">
           ${RPE_ITEMS.map(item => `
             <button type="button" class="v3-rpe-btn rpe-${item.rpe} ${currentRpe === item.rpe ? 'on' : ''}"
               onclick="v3SaveWorkoutFeedback('${dt}','${pid}',${item.rpe},${closeModalOnSelect})">
               <span class="v3-rpe-icon">${item.icon}</span>
               <span class="v3-rpe-text">
-                <b>${esc(item.label)}</b>
-                <small>${esc(item.sub)}</small>
+                <b>${esc(S.lang === 'en' ? item.labelEn : item.label)}</b>
+                <small>${esc(S.lang === 'en' ? item.subEn : item.sub)}</small>
               </span>
             </button>
           `).join('')}
@@ -110,7 +110,7 @@
     const p = S.plans.find(x => x.id === pid);
     if (!p) return;
     v27Modal(`
-      <h2>💬 Trainings-Feedback</h2>
+      <h2>💬 ${S.lang === 'en' ? 'Workout feedback' : 'Trainings-Feedback'}</h2>
       <p class="mu" style="margin:0 0 10px">${esc(p.name)} · ${new Date(dt + 'T12:00:00').toLocaleDateString('de-AT')}</p>
       ${window.v3RenderRpeSelectorHtml(dt, pid, true)}
       <button type="button" class="chip" style="margin-top:12px;width:100%" onclick="v27CloseModal()">Schließen</button>
@@ -262,7 +262,7 @@
       return `
         <div class="c v3-deload-card" style="border:1.5px solid var(--mc)">
           <div class="r" style="justify-content:space-between">
-            <b>🔴 Rücksicht auf Gelenke & Beschwerden</b>
+            <b>🔴 ${S.lang === 'en' ? 'Joint & pain protection' : 'Rücksicht auf Gelenke & Beschwerden'}</b>
             <span class="chip" style="font-size:11px;padding:2px 8px;border-color:var(--mc);color:var(--mc)">${esc(evalRes.curLevel)}${evalRes.canLower ? ' ➔ ' + esc(evalRes.prevLevel) : ''}</span>
           </div>
           <p class="mu" style="font-size:13px;margin:6px 0 10px">
@@ -281,7 +281,7 @@
       return `
         <div class="c v3-levelup-card" style="border:1.5px solid var(--ac);background:linear-gradient(135deg,var(--card),var(--ac2))">
           <div class="r" style="justify-content:space-between">
-            <b>⭐ Stufen-Erhöhung empfohlen!</b>
+            <b>⭐ ${S.lang === 'en' ? 'Level-up recommended!' : 'Stufen-Erhöhung empfohlen!'}</b>
             <span class="chip on" style="font-size:11px;padding:2px 8px">${esc(evalRes.curLevel)} ➔ ${esc(evalRes.nextLevel)}</span>
           </div>
           <p class="mu" style="font-size:13px;margin:6px 0 10px">
@@ -347,10 +347,10 @@
         const fbRow = document.createElement('div');
         fbRow.className = 'r v3-home-rpe-row';
         fbRow.innerHTML = meta
-          ? `<span class="mu" style="font-size:12px">Heutiges Empfinden: <b>${meta.icon} ${esc(meta.label)}</b></span>
-             <button type="button" class="chip" style="font-size:11px;padding:4px 10px" onclick="v3OpenFeedbackModal('${dt}','${pid}')">✎ Ändern</button>`
-          : `<span class="mu" style="font-size:12px">Wie war die Belastung heute?</span>
-             <button type="button" class="chip on" style="font-size:11px;padding:4px 10px" onclick="v3OpenFeedbackModal('${dt}','${pid}')">💬 Training bewerten</button>`;
+          ? `<span class="mu" style="font-size:12px">${S.lang === 'en' ? "Today's rating:" : 'Heutiges Empfinden:'} <b>${meta.icon} ${esc(S.lang === 'en' ? meta.labelEn : meta.label)}</b></span>
+             <button type="button" class="chip" style="font-size:11px;padding:4px 10px" onclick="v3OpenFeedbackModal('${dt}','${pid}')">✎ ${S.lang === 'en' ? 'Change' : 'Ändern'}</button>`
+          : `<span class="mu" style="font-size:12px">${S.lang === 'en' ? 'How was the intensity today?' : 'Wie war die Belastung heute?'}</span>
+             <button type="button" class="chip on" style="font-size:11px;padding:4px 10px" onclick="v3OpenFeedbackModal('${dt}','${pid}')">💬 ${S.lang === 'en' ? 'Rate workout' : 'Training bewerten'}</button>`;
 
         const progressRow = planCard.querySelector('.bar')?.nextElementSibling;
         if (progressRow) progressRow.after(fbRow);
