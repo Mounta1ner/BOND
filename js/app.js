@@ -1,11 +1,10 @@
-
 // Format: Name|Alias1,Alias2|Kategorie|Material|Beschreibung|Start|Ende
 const EX = window.FITNESS_CATALOG.exercises;
 const isM=e=>!!e&&(e.sub==="Ausdauer"||!!e.br);const unit=e=>isM(e)?"Min.":isT(e)?"Sek.":"Wdh.";
 const DAYS=["Mo","Di","Mi","Do","Fr","Sa","So"];
 
 // --- INITIAL STATE ---
-let S = { custom: [], plans: [], log: {}, habits: [], habitLog: {}, fav: [], penalty: { enabled: false, balance: 0.0 }, ui: { actCompact: false }, lang: "de", theme: "auto" };
+let S = { custom: [], plans: [], log: {}, setLog: {}, setDrafts: {}, workoutFeedback: {}, habits: [], habitLog: {}, fav: [], weights: [], homeOrder: ["plans","mindImpulse","activities","bpm","weight","breath","finance"], homeVisible: {}, penalty: { enabled: false, balance: 0.0 }, ui: { actCompact: false }, lang: "de", theme: "auto" };
 try {
   const t = localStorage.getItem("trainingsplan-v1");
   if (t) {
@@ -53,6 +52,15 @@ function closeDet(id) {
 }
 
 // Progressions-Stufen
+
+function effective(it, p) {
+  const lvl = Math.max(0, PROG_LEVELS.indexOf(getPlanLevel(p)));
+  const e = ex(it.ex), timed = e && (isT(e) || isM(e));
+  const sets = Math.min(6, Math.max(1, (+it.sets || 1) + Math.floor(lvl / 2)));
+  const reps = Math.max(1, Math.round((+it.reps || 1) * (timed ? (1 + 0.12 * lvl) : (1 + 0.08 * lvl))));
+  return { ...it, sets, reps };
+}
+
 const PROG_LEVELS = ["Anfänger", "Amateur", "Fortgeschritten", "Intensiv", "Intensiv L2", "Intensiv L3", "Intensiv L4"];
 function getPlanLevel(p) { return p.level || "Anfänger"; }
 function setPlanLevel(pid, lvl) {
@@ -87,29 +95,29 @@ function levelUpPlan(pid) {
 
 // Aktivitäten / Gewohnheiten Tracking
 let chAct = false;
-function trackHabitLegacy(id, isDone) {
-  const h = S.habits.find(x => x.id === id);
+
+function trackHabit(id, isDone) {
+  if (typeof window.v3MasterTrackHabit === 'function') {
+    return window.v3MasterTrackHabit(id, isDone);
+  }
+  const h = S.habits.find(x => String(x.id) === String(id));
   if (!h) return;
-  const dt = iso(new Date());
-  S.habitLog[dt] = S.habitLog[dt] || {};
-  const prev = S.habitLog[dt][id];
-  if (prev === isDone) {
-    delete S.habitLog[dt][id];
-    if (isDone) h.doneCount = Math.max(0, (h.doneCount || 1) - 1);
-    else h.missedCount = Math.max(0, (h.missedCount || 1) - 1);
+  const d = iso(), today = S.habitLog[d] || (S.habitLog[d] = {});
+  if (isDone) {
+    today[h.id] = (typeof today[h.id] === 'number' ? today[h.id] : (today[h.id] === true ? 1 : 0)) + 1;
+    h.doneCount = (+h.doneCount || 0) + 1;
   } else {
-    S.habitLog[dt][id] = isDone;
-    if (isDone) {
-      h.doneCount = (h.doneCount || 0) + 1;
-      if (S.penalty.enabled && h.penaltyDone) S.penalty.balance += (+h.penaltyDone || 0);
-    } else {
-      h.missedCount = (h.missedCount || 0) + 1;
-      if (S.penalty.enabled && h.penaltyMiss) S.penalty.balance += (+h.penaltyMiss || 0);
-    }
+    today[h.id] = false;
+    h.missedCount = (+h.missedCount || 0) + 1;
+  }
+  if (typeof window.v3ProcessHabitFinance === 'function') {
+    window.v3ProcessHabitFinance(h.id, isDone ? 'done' : 'skip');
   }
   save();
+  if (typeof syncWidgets === 'function') syncWidgets();
   render();
 }
+
 function addHabit(name, missRate, doneRate, days) {
   if (!name.trim()) { toast("Bitte einen Namen für die Aktivität angeben."); return; }
   const newH = {
@@ -148,42 +156,7 @@ function resetHabitStats(id) {
   }
 }
 
-// Make Me Feel It Spendenfunktion
-function resetPenalty() {
-  if (confirm("Hast du den Betrag von " + (S.penalty.balance||0).toFixed(2) + " € gespendet und möchtest das Konto auf 0,00 € zurücksetzen?")) {
-    S.penalty.balance = 0.0;
-    save();
-    render();
-    toast("Konto auf 0,00 € zurückgesetzt – vielen Dank für deine Spende! ❤️");
-  }
-}
 
-// Erweiterte Statistik für Verlauf
-function statsExt() {
-  let total = 0, lastMonth = 0, missed = 0;
-  const now = new Date();
-  const thirtyDays = new Date(now.getTime() - 30 * 864e5);
-  Object.keys(S.log).forEach(d => {
-    const dt = new Date(d + "T12:00:00");
-    S.plans.forEach(p => {
-      if (planPct(p, d) >= 100) {
-        total++;
-        if (dt >= thirtyDays && dt <= now) lastMonth++;
-      }
-    });
-  });
-  const fixed = S.plans.filter(p => p.days && p.days.length);
-  for (let k = 1; k <= 45; k++) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - k);
-    const dateStr = iso(d);
-    const w = wd(d);
-    fixed.forEach(p => {
-      if (p.days.includes(w) && planPct(p, dateStr) < 100) missed++;
-    });
-  }
-  return { total, lastMonth, missed, run: stats().run, best: stats().best };
-}
 
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const all=()=>EX.concat(S.custom);
@@ -200,25 +173,16 @@ function render(){nav();const a=document.getElementById("app");a.innerHTML={toda
 function vToday(){
  const now=new Date(),dt=iso(now),w=wd(now);
  const ps=S.plans.filter(p=>p.days.length?p.days.includes(w):(p.flexAlways||weekDone(p)<(p.pw||1)||planPct(p,dt)>0));
- let h=`<h2>Home, ${DAYS[w]} ${now.toLocaleDateString("de-AT")}</h2><div class="r sc" style="margin-bottom:6px"><span class="mu" style="flex:none">Pause-Timer:</span>${[30,60,90].map(s=>`<button class="chip" onclick="tmStart(${s},'Pause')">${s} s</button>`).join("")}</div>`;
+ let planH=`<h2>Home, ${DAYS[w]} ${now.toLocaleDateString("de-AT")}</h2><div class="r sc" style="margin-bottom:6px"><span class="mu" style="flex:none">Pause-Timer:</span>${[30,60,90].map(s=>`<button class="chip" onclick="tmStart(${s},'Pause')">${s} s</button>`).join("")}</div>`;
 
- // 1. Vorschlag zur Stufenerhöhung (Progression)
- ps.forEach(p=>{
-   if(planRecentDoneCount(p)>=3 && PROG_LEVELS.indexOf(getPlanLevel(p)) < PROG_LEVELS.length-1){
-     const nextLvl = PROG_LEVELS[PROG_LEVELS.indexOf(getPlanLevel(p))+1];
-     h+=`<div class="c" style="border:1.5px solid var(--mc);background:linear-gradient(135deg,var(--card),var(--ac2))"><div class="r" style="justify-content:space-between"><b>⭐ Stufen-Erhöhung empfohlen!</b><span class="chip on" style="font-size:11px">${getPlanLevel(p)} ➔ ${nextLvl}</span></div><p class="mu" style="font-size:13px;margin:4px 0 8px">Du hast „${esc(p.name)}“ in den letzten 2 Wochen mehrfach gemeistert. Bereit für die nächste Stufe?</p><button class="b" onclick="levelUpPlan('${p.id}')">Auf Stufe „${nextLvl}“ erhöhen</button></div>`;
-   }
- });
-
- // 2. Heutiger Plan (einklappbar)
  if(!S.plans.length){
-   h+=`<div class="c" style="text-align:center;padding:16px 12px"><p style="font-weight:600;margin-bottom:4px">Noch keine Pläne zugewiesen</p><p class="mu" style="font-size:13px;margin-bottom:12px">Wähle einen der vorbereiteten Standardpläne (z. B. Büro-Fit, Bauch-Beine-Po, Läufer) oder erstelle deinen eigenen Plan.</p><button class="b" onclick="go('plans')">📋 Zu den Plänen & Vorlagen</button></div>`;
+   planH+=`<div class="c" style="text-align:center;padding:16px 12px"><p style="font-weight:600;margin-bottom:4px">Noch keine Pläne zugewiesen</p><p class="mu" style="font-size:13px;margin-bottom:12px">Wähle einen der vorbereiteten Standardpläne (z. B. Büro-Fit, Bauch-Beine-Po, Läufer) oder erstelle deinen eigenen Plan.</p><button class="b" onclick="go('plans')">📋 Zu den Plänen & Vorlagen</button></div>`;
  } else if(!ps.length){
-   h+=`<div class="c mu">Für heute ist kein Training fällig. Du hast ${S.plans.length} aktive Pläne.</div>`;
+   planH+=`<div class="c mu">Für heute ist kein Training fällig. Du hast ${S.plans.length} aktive Pläne.</div>`;
  } else {
    ps.forEach(p=>{const l=((S.log[dt]||{})[p.id])||{};const pc=planPct(p,dt);
     const isCol = S.ui["planCol_"+p.id];
-    h+=`<div class="c">
+    planH+=`<div class="c">
       <div class="r" style="cursor:pointer;justify-content:space-between;user-select:none" onclick="S.ui['planCol_${p.id}']=!S.ui['planCol_${p.id}'];save();render()">
         <div style="flex:1">
           <h3 style="display:inline-block">${esc(p.name)}</h3>
@@ -229,23 +193,21 @@ function vToday(){
       <div class="r" style="margin-top:7px"><span class="mu">Stufe:</span><select aria-label="Leistungsstufe" style="width:auto;max-width:195px" onchange="setPlanLevel('${p.id}',this.value)">${PROG_LEVELS.map(l=>`<option ${getPlanLevel(p)===l?"selected":""}>${l}</option>`).join("")}</select></div><div class="bar" style="margin-top:6px"><i style="width:${pc}%"></i></div>
       <div class="r" style="justify-content:space-between;margin-top:4px"><span class="mu" style="font-size:13px">${pc>=100?"✓ Fertig für heute":pc+"% geschafft"}</span><span class="mu" style="font-size:12px">${p.items.length} Übungen</span></div>
       ${p.days.length?"":(()=>{const d=weekDone(p),n=p.pw||1;return`<div class="mu" style="margin-top:4px;font-size:13px">📆 Diese Woche: ${"●".repeat(Math.min(d,n))}${"○".repeat(Math.max(0,n-d))} <b>${d} von ${n}</b>${d>=n?" · 🎉 Wochenziel erreicht":" · noch "+(n-d)}</div>`})()}
-      
       <div style="${isCol?"display:none":""};margin-top:10px">
     `;
     p.items.forEach((it,i)=>{const e=ex(it.ex);if(!e)return;const dn=l[i]||0;it=effective(it,p);
-     h+=`<div style="margin-top:12px;padding-top:8px;border-top:1px solid var(--bd)"><div class="r" style="justify-content:space-between"><b style="cursor:pointer" onclick="tg('${p.id}_${i}')">${esc(e.n)} ${tdo[p.id+"_"+i]?"▲":"▼"}</b> <span class="mu" style="font-size:13px">${it.sets} × ${it.reps}${unit(e)!=="Wdh."?" "+unit(e):""}${+it.kg?" · "+it.kg+" kg":""}</span></div><div class="r" style="margin-top:6px">`;
-     for(let s=1;s<=it.sets;s++)h+=`<button class="set ${dn>=s?"on":""}" onclick="tick('${dt}','${p.id}',${i},${s})">${s}</button>`;
-     h+=`${e.br?`<button class="b" onclick="brOpen('${e.id}',${it.reps},'${dt}','${p.id}',${i})">🌬️ ${it.reps} min</button>`:unit(e)==="Wdh."?`<button class="b g" onclick="v28StartPlanSet('${e.id}',${it.reps},'${dt}','${p.id}',${i})">▶ Wiederholungen</button>`:unit(e)!=="Wdh."?`<button class="b g" onclick="holdT('${dt}','${p.id}',${i})">▶ ${it.reps} ${unit(e)==="Min."?"min":"s"}</button>`:""}</div>${tdo[p.id+"_"+i]?`<div class="c" style="background:var(--bg)">${detTxt(e)}<div style="margin-top:10px;text-align:right"><button class="b g" style="min-height:44px;padding:6px 14px;border-radius:8px" onclick="closeDet('${p.id}_${i}')">▲ Beschreibung einklappen</button></div></div>`:""}</div>`});
-    h+=`</div></div>`});
+     planH+=`<div style="margin-top:12px;padding-top:8px;border-top:1px solid var(--bd)"><div class="r" style="justify-content:space-between"><b style="cursor:pointer" onclick="tg('${p.id}_${i}')">${esc(e.n)} ${tdo[p.id+"_"+i]?"▲":"▼"}</b> <span class="mu" style="font-size:13px">${it.sets} × ${it.reps}${unit(e)!=="Wdh."?" "+unit(e):""}${+it.kg?" · "+it.kg+" kg":""}</span></div><div class="r" style="margin-top:6px">`;
+     for(let s=1;s<=it.sets;s++)planH+=`<button class="set ${dn>=s?"on":""}" onclick="tick('${dt}','${p.id}',${i},${s})">${s}</button>`;
+     planH+=`${e.br?`<button class="b" onclick="brOpen('${e.id}',${it.reps},'${dt}','${p.id}',${i})">🌬️ ${it.reps} min</button>`:unit(e)==="Wdh."?`<button class="b g" onclick="v28StartPlanSet('${e.id}',${it.reps},'${dt}','${p.id}',${i})">▶ Wiederholungen</button>`:unit(e)!=="Wdh."?`<button class="b g" onclick="holdT('${dt}','${p.id}',${i})">▶ ${it.reps} ${unit(e)==="Min."?"min":"s"}</button>`:""}</div>${tdo[p.id+"_"+i]?`<div class="c" style="background:var(--bg)">${detTxt(e)}<div style="margin-top:10px;text-align:right"><button class="b g" style="min-height:44px;padding:6px 14px;border-radius:8px" onclick="closeDet('${p.id}_${i}')">▲ Beschreibung einklappen</button></div></div>`:""}</div>`});
+    planH+=`</div></div>`});
  }
 
- // 3. Aktivitäten & Routinen (Tracking, Erstellen, Kompakt vs. Ausgeklappt)
  const habitsDue = (S.habits||[]);
  const habitLogToday = S.habitLog[dt] || {};
  const dueCount = habitsDue.length;
  const doneHabitCount = habitsDue.filter(hb=>(habitLogToday[hb.id]===true || (+habitLogToday[hb.id]||0)>0)).length;
 
- h+=`<div class="c">
+ let actH=`<div class="c">
    <div class="r" style="justify-content:space-between;align-items:center">
      <div><h3>🎯 Aktivitäten & Routinen</h3><span class="mu" style="font-size:12px">${dueCount ? (doneHabitCount + " von " + dueCount + " heute erledigt") : "Noch keine Aktivitäten angelegt"}</span></div>
      <div class="r" style="gap:6px">
@@ -254,14 +216,14 @@ function vToday(){
      </div>
    </div>
  `;
-
  if(typeof chAct !== "undefined" && chAct){
-   h+=`<div class="c" style="background:var(--bg);margin-top:10px">
+   actH+=`<div class="c" style="background:var(--bg);margin-top:10px">
      <h4 style="margin:0 0 6px">Neue Aktivität erstellen</h4>
      <input id="act_name" placeholder="z. B. 2.5L Wasser trinken, 10 Min Physio, 7000 Schritte">
+     ${typeof habitSetup==='function'?habitSetup():''}
      <div class="r" style="margin-top:8px">
        <span class="mu" style="font-size:13px">Wochentage:</span>
-       <div class="r" id="act_days_box">${DAYS.map((d,i)=>`<button type="button" class="chip on" data-d="${i}" onclick="this.classList.toggle('on')">${d}</button>`).join("")}</div>
+       <div class="r" id="act_days_box" style="display:none">${DAYS.map((d,i)=>`<button type="button" class="chip on" data-d="${i}" onclick="this.classList.toggle('on')">${d}</button>`).join("")}</div>
      </div>
      <div class="r" style="margin-top:10px">
        <button class="b" onclick="const days=[...document.querySelectorAll('#act_days_box .chip.on')].map(b=>+b.dataset.d);addHabit(document.getElementById('act_name').value, 0, 0, days)">Aktivität speichern</button>
@@ -269,19 +231,16 @@ function vToday(){
      </div>
    </div>`;
  }
-
- h+=`<div style="margin-top:8px">`;
+ actH+=`<div style="margin-top:8px">`;
  if(!S.habits.length){
-   h+=`<div class="mu" style="font-size:13px">Tippe oben auf <b>„+ Neu“</b>, um deine erste tägliche Aktivität oder Physio-Routine anzulegen.</div>`;
- } else if(!habitsDue.length){
-   h+=`<div class="mu" style="font-size:13px">Für heute sind keine Aktivitäten geplant (${S.habits.length} insgesamt angelegt).</div>`;
+   actH+=`<div class="mu" style="font-size:13px">Tippe oben auf <b>„+ Neu“</b>, um deine erste tägliche Aktivität oder Physio-Routine anzulegen.</div>`;
  } else if(S.ui.actCompact){
-   h+=`<div class="r" style="gap:6px;flex-wrap:wrap">`+habitsDue.map(hb=>{
+   actH+=`<div class="r" style="gap:6px;flex-wrap:wrap">`+habitsDue.map(hb=>{
      const isD = habitLogToday[hb.id]===true || (+habitLogToday[hb.id]||0)>0;
      return `<button class="chip ${isD?"on":""}" style="min-height:38px;font-size:13px" onclick="trackHabit('${hb.id}', true)">${isD?"✓ ":"○ "}${esc(hb.name)} ${+habitLogToday[hb.id]||0}×</button>`;
    }).join("")+`</div>`;
  } else {
-   h+=habitsDue.map(hb=>{
+   actH+=habitsDue.map(hb=>{
      const isD = habitLogToday[hb.id]===true || (+habitLogToday[hb.id]||0)>0;
      return `<div class="r" style="margin-top:8px;padding:6px 0;border-bottom:1px solid var(--bd);align-items:center">
        <span style="flex:1"><b>${esc(hb.name)}</b><br><span class="mu" style="font-size:12px">✓ ${hb.doneCount||0}× absolviert · ✗ ${hb.missedCount||0}× ausgelassen</span></span>
@@ -293,11 +252,27 @@ function vToday(){
      </div>`;
    }).join("");
  }
- h+=`</div></div>`;
+ actH+=`</div></div>`;
 
- h+=doneWeekHtml()+quoteHtml()+favHtml();
+ const chunks = {
+   plans: planH,
+   mindImpulse: typeof window.v3RenderHomeMindSlot === 'function' ? window.v3RenderHomeMindSlot() : '',
+   activities: actH,
+   bpm: typeof bpmCard === 'function' ? bpmCard() : '',
+   weight: typeof weightQuick === 'function' ? weightQuick() : '',
+   breath: typeof breathHint === 'function' ? breathHint() : '',
+   finance: typeof window.financeHome === 'function' ? window.financeHome() : ''
+ };
+ const defaultKeys = ['plans', 'mindImpulse', 'activities', 'bpm', 'weight', 'breath', 'finance'];
+ const order = [...new Set([...(Array.isArray(S.homeOrder) ? S.homeOrder : defaultKeys), ...defaultKeys])];
+ const vis = S.homeVisible || {};
+ const sectionsHtml = order
+   .filter(k => defaultKeys.includes(k) && vis[k] !== false && chunks[k])
+   .map(k => `<section class="home-section" data-module="${k}">${chunks[k]}</section>`)
+   .join('');
 
- return h;
+ const extrasHtml = `<section class="home-extras">${doneWeekHtml()}${quoteHtml()}${favHtml()}</section>`;
+ return sectionsHtml + extrasHtml;
 }
 function tick(dt,pid,i,s){S.log[dt]=S.log[dt]||{};const l=S.log[dt][pid]=S.log[dt][pid]||{},p=S.plans.find(x=>x.id===pid),was=p?planPct(p,dt):0;l[i]=(l[i]||0)>=s?s-1:s;save();render();if(p&&was<100&&planPct(p,dt)>=100){toast("Plan geschafft für heute – stark! 💪");try{navigator.vibrate&&navigator.vibrate(200)}catch(e){}}}
 
@@ -353,8 +328,8 @@ let rule="FREQ=WEEKLY;BYDAY="+rm.days.map(i=>["MO","TU","WE","TH","FR","SA","SU"
 if(rm.mode==="until"){var ruleG=null;const u=new Date((rm.until||"")+"T23:59:59");if(isNaN(u)||u<d){toast("Das Enddatum liegt vor dem ersten Termin ("+d.toLocaleDateString("de-AT")+").");return}rule+=";UNTIL="+f(u);ruleG=rule.split(";UNTIL=")[0]+";UNTIL="+u.toISOString().replace(/[-:]/g,"").split(".")[0]+"Z"}else rule+=";COUNT="+Math.max(1,Math.min(200,rm.count||1));
 const end=new Date(d.getTime()+rm.dur*60000),q=t=>String(t).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n");
 const desc=p.items.map(it=>{const e=ex(it.ex);return "• "+(e?e.n:"?")+" "+it.sets+" × "+it.reps+(e&&unit(e)!=="Wdh."?" "+unit(e):"")+(+it.kg?" · "+it.kg+" kg":"")}).join("\n");
-const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//BOND//DE","CALSCALE:GREGORIAN","METHOD:PUBLISH","BEGIN:VEVENT","UID:"+p.id+"-"+Date.now()+"@bond-training","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,""),"DTSTART:"+f(d),"DTEND:"+f(end),"RRULE:"+rule,"SUMMARY:"+q("Training: "+p.name),"DESCRIPTION:"+q(desc),"BEGIN:VALARM","TRIGGER:"+(rm.pre?"-PT"+rm.pre+"M":"PT0S"),"ACTION:DISPLAY","DESCRIPTION:"+q("Training: "+p.name),"END:VALARM","END:VEVENT","END:VCALENDAR"];
-const fold=l=>{let o="";while(l.length>60){o+=l.slice(0,60)+"\r\n ";l=l.slice(60)}return o+l},txt=L.map(fold).join("\r\n")+"\r\n",fn="BOND-"+p.name.replace(/[^A-Za-z0-9äöüÄÖÜß-]+/g,"-")+".ics";
+const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//BOND//DE","CALSCALE:GREGORIAN","METHOD:PUBLISH","BEGIN:VEVENT","UID:"+p.id+"-"+Date.now()+"@mein-training","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,""),"DTSTART:"+f(d),"DTEND:"+f(end),"RRULE:"+rule,"SUMMARY:"+q("Training: "+p.name),"DESCRIPTION:"+q(desc),"BEGIN:VALARM","TRIGGER:"+(rm.pre?"-PT"+rm.pre+"M":"PT0S"),"ACTION:DISPLAY","DESCRIPTION:"+q("Training: "+p.name),"END:VALARM","END:VEVENT","END:VCALENDAR"];
+const fold=l=>{let o="";while(l.length>60){o+=l.slice(0,60)+"\r\n ";l=l.slice(60)}return o+l},txt=L.map(fold).join("\r\n")+"\r\n",fn="Mein-Training-"+p.name.replace(/[^A-Za-z0-9äöüÄÖÜß-]+/g,"-")+".ics";
 try{const b=new Blob([txt],{type:"text/calendar;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=fn;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(u);a.remove()},4000)}catch(e){}
 const first=d.toLocaleDateString("de-AT",{weekday:"long",day:"numeric",month:"long"})+" um "+rm.time+" Uhr",tz=(Intl.DateTimeFormat().resolvedOptions().timeZone)||"Europe/Vienna",gcal="https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent("Training: "+p.name)+"&dates="+f(d)+"/"+f(end)+"&details="+encodeURIComponent(desc)+"&recur="+encodeURIComponent("RRULE:"+(typeof ruleG==="string"?ruleG:rule))+"&ctz="+encodeURIComponent(tz);
 document.getElementById("app").innerHTML=`<h2>Kalenderdatei erstellt</h2><div class="c"><p>Erster Termin: <b>${esc(first)}</b>, danach jeweils ${rm.days.map(i=>DAYS[i]).join(", ")}, ${rm.mode==="count"?rm.count+" Termine insgesamt":"bis "+new Date(rm.until+"T12:00").toLocaleDateString("de-AT")}.</p><p class="mu"><b>iPhone:</b> Tippe nach dem Download auf die Datei (Safari-Download oder Dateien-App) und wähle „Alle hinzufügen“.<br><b>Android:</b> Öffne die heruntergeladene Datei (Benachrichtigung oder Downloads) mit dem Google Kalender.</p></div><div class="c"><h3>Direkt in Google Kalender</h3><p class="mu">Alternative ohne Datei: öffnet Google Kalender mit dem fertig ausgefüllten wiederkehrenden Termin. Die Erinnerung stellst du dort im Termin ein.</p><a class="b" style="display:inline-block;text-decoration:none" target="_blank" rel="noopener" href="${gcal}">📅 In Google Kalender öffnen</a></div><div class="c"><h3>Hat kein Download gestartet?</h3><p class="mu">Dann kopiere den Text, speichere ihn in einer Textdatei mit der Endung .ics und öffne diese. In manchen Vorschauen und eingebetteten Ansichten sind Downloads gesperrt, auf deiner eigenen Adresse (GitHub) funktionieren sie.</p><textarea rows="5" id="ics" readonly>${esc(txt)}</textarea><div class="r" style="margin-top:8px"><button class="b" onclick="cpId('ics')">Text kopieren</button></div></div><button class="b g" onclick="rm=null;render()">Fertig</button>`}
@@ -450,9 +425,6 @@ function brStart(){BR.state="run";BR.el=0;BR.i=-1;BR.last=performance.now();try{
 function brPause(){if(BR.state==="run"){BR.state="pause"}else{BR.state="run";BR.last=performance.now();requestAnimationFrame(brLoop)}brView();brDraw()}
 function brLoop(){if(!BR||BR.state!=="run")return;const n=performance.now();BR.el+=n-BR.last;BR.last=n;if(BR.el>=BR.min*60000){BR.el=BR.min*60000;brFinish();return}const i=brDraw();if(i!==BR.i){BR.i=i;brCue(BR.ph[i].k)}requestAnimationFrame(brLoop)}
 function brFinish(){BR.state="done";try{BR.wl&&BR.wl.release&&BR.wl.release().catch(()=>{})}catch(e){}brView();brCue("A");try{navigator.vibrate&&navigator.vibrate([150,80,150])}catch(e){}if(BR.pid){const p=S.plans.find(x=>x.id===BR.pid);if(p&&p.items[BR.ix])tickNext(BR.dt,BR.pid,BR.ix,+effective(p.items[BR.ix],p).sets)}}
-const ADD6_RAW=`Laufen|Joggen,Jogging,Dauerlauf,Running,Laufen im Freien,Ausdauerlauf|Fitnessstudio|Laufschuhe|Starte mit 5 Minuten zügigem Gehen. Laufe dann in einem Tempo, bei dem du dich noch in ganzen Sätzen unterhalten kannst. Als Anfänger wechselst du zwischen Laufen und Gehen und verlängerst die Laufphasen langsam. Zum Schluss 5 Minuten locker gehen und leicht dehnen.|Aufrecht stehen, Blick nach vorn, Schultern locker|Lockerer, gleichmäßiger Laufschritt|Ausdauer, Herz-Kreislauf, Stressabbau, Stimmung, Gewichtskontrolle, Oberschenkel, Wade, Fuß, Hüfte, Knochen, Abnehmen|Akute Schmerzen oder Verletzungen an Knie, Schienbein, Achillessehne, Fuß oder Hüfte; Fieber oder Infekt; bekannte Herz-Kreislauf-Erkrankungen, starkes Übergewicht oder lange Trainingspause: vorher ärztlich abklären; bei stechendem Schmerz sofort abbrechen; nicht bei Glatteis oder schlechter Sicht|28,7,26,13,24,26,17,34,11,36,21,19,24,24;M24 26L31 31L29 38M26 13L31 19L35 15|28,7,26,13,24,26,31,31,29,38,31,19,35,15;M24 26L18 34L11 36M26 13L21 19L24 24|Worauf du beim richtigen Laufen achtest. Haltung: aufrecht, der Blick geht 20 bis 30 Meter nach vorn, Schultern locker und tief, der Oberkörper ist leicht nach vorn geneigt (aus den Fußgelenken, nicht aus der Hüfte). Arme: im Ellbogen etwa im rechten Winkel gebeugt, locker neben dem Körper vor und zurück, die Hände entspannt. Schritt: lieber kurze, schnelle Schritte als weites Ausgreifen. Der Fuß landet möglichst unter dem Körper, nicht weit davor. Ob Ferse oder Mittelfuß ist weniger wichtig als eine weiche, leise Landung. Tempo: gerade so schnell, dass du dich noch unterhalten kannst, besonders am Anfang. Aufbau: Wechsle als Anfänger zwischen Gehen und Laufen und verlängere die Laufphasen von Woche zu Woche, zum Beispiel von 2 Minuten bis hin zu 30 Minuten am Stück. Plane 2 bis 3 Einheiten pro Woche mit Ruhetagen dazwischen. Steigere nicht Umfang und Tempo gleichzeitig, als grobe Faustregel höchstens etwa 10 % mehr pro Woche. Schuhe und Boden: passende Laufschuhe aus dem Fachhandel, Wald- und Feldwege sind gelenkschonender als Asphalt. Schmerz: Muskelkater ist normal, stechende Schmerzen in Gelenken oder Sehnen nicht. Dann pausieren und bei anhaltenden Beschwerden abklären lassen.|Ausdauer`;
-ADD6_RAW.split("\n").forEach(l=>{const[n,al,c,m,d,s,e2,g,x,fa,fb,t,sub]=l.split("|");EX.push({id:"e"+EX.length,n,al:al.split(","),c,m,d,s,e:e2,g,x,l:t||"",sub:sub||"",fig:[drawFig(fa),drawFig(fb)]})});
-EX.find(e=>e.n==="Laufen").yt={id:"XQ0hB29DMpo",t:"Joggen: Meine 5 Tipps zum Einstieg ins Lauftraining (ARD Gesund, Dr. Julia Fischer)"};
 function ytHtml(e){return e.yt?`<div style="margin:8px 0"><a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=${e.yt.id}">▶ Video: ${esc(e.yt.t)}</a> <button class="chip" onclick="ytPlay('${e.id}')">Hier abspielen</button><div id="yt_${e.id}"></div></div>`:""}
 function ytPlay(id){const e=ex(id),d=document.getElementById("yt_"+id);if(!e||!d)return;d.innerHTML='<div style="position:relative;padding-top:56.25%;margin-top:8px"><iframe src="https://www.youtube-nocookie.com/embed/'+e.yt.id+'" title="Video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;border-radius:12px" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div><p class="mu" style="font-size:12px">Startet das Video nicht, öffne es über den Link.</p>'}
 function weekDone(p,ref){const r=ref||new Date(),m=new Date(r.getFullYear(),r.getMonth(),r.getDate()-wd(r));let n=0;for(let i=0;i<7;i++){const d=new Date(m);d.setDate(m.getDate()+i);if(planPct(p,iso(d))>=100)n++}return n}
@@ -540,68 +512,16 @@ function delEx(id){if(cdel!==id){cdel=id;toast("Zum Löschen noch einmal tippen"
 
 function vHist(){
  const now=new Date();
- const ext = statsExt();
- let h=`<h2>Verlauf & Statistiken</h2>`;
- 
- h+=`<div class="r" style="gap:8px;flex-wrap:wrap">
-   <div class="c" style="flex:1;min-width:130px;text-align:center;padding:12px 6px">
-     <div style="font-size:24px">🔥</div>
-     <div style="font-size:26px;font-weight:800">${ext.run} Tage</div>
-     <div class="mu" style="font-size:12px">Serie laut Plan</div>
-   </div>
-   <div class="c" style="flex:1;min-width:130px;text-align:center;padding:12px 6px">
-     <div style="font-size:24px">🏆</div>
-     <div style="font-size:26px;font-weight:800">${ext.best} Tage</div>
-     <div class="mu" style="font-size:12px">Beste Serie</div>
-   </div>
-   <div class="c" style="flex:1;min-width:130px;text-align:center;padding:12px 6px">
-     <div style="font-size:24px">✅</div>
-     <div style="font-size:26px;font-weight:800">${ext.total}</div>
-     <div class="mu" style="font-size:12px">Gesamt absolviert</div>
-   </div>
-   <div class="c" style="flex:1;min-width:130px;text-align:center;padding:12px 6px">
-     <div style="font-size:24px">📅</div>
-     <div style="font-size:26px;font-weight:800">${ext.lastMonth}</div>
-     <div class="mu" style="font-size:12px">Im letzten Monat</div>
-   </div>
-   <div class="c" style="flex:1;min-width:130px;text-align:center;padding:12px 6px">
-     <div style="font-size:24px">⚠️</div>
-     <div style="font-size:26px;font-weight:800;color:var(--mc)">${typeof missedTrainingTotal==='function'?missedTrainingTotal():ext.missed}</div>
-     <div class="mu" style="font-size:12px">Verpasste Trainings</div>
-   </div>
- </div>`;
-
- h+=`<div class="c"><h3>🎯 Aktivitäten & Gewohnheiten Verlauf</h3>`;
- if(!S.habits || !S.habits.length){
-   h+=`<div class="mu">Noch keine Aktivitäten angelegt. Lege unter „Home“ Aktivitäten an.</div>`;
- } else {
-   S.habits.forEach(hb=>{
-     h+=`<div style="margin-top:10px;padding-bottom:10px;border-bottom:1px solid var(--bd)">
-       <div class="r" style="justify-content:space-between;align-items:center">
-         <b>${esc(hb.name)}</b>
-         <button class="b g" style="font-size:11px;padding:3px 8px;min-height:30px" onclick="resetHabitStats('${hb.id}')">🔄 Zähler zurücksetzen</button>
-       </div>
-       <div class="r" style="margin-top:6px;gap:16px;font-size:13px">
-         <span style="color:var(--ok)">✓ Absolviert: <b>${hb.doneCount||0}×</b></span>
-         <span style="color:var(--mc)">✗ Ausgelassen: <b>${hb.missedCount||0}×</b></span>
-       </div>
-     </div>`;
-   });
- }
- h+=`</div>`;
-
  const mon=new Date(now);mon.setDate(now.getDate()-wd(now));
- h+=`<div class="c"><h3>Diese Woche</h3>`;
+ let h=`<div class="c"><h3>Diese Woche</h3>`;
  if(!S.plans.length)h+=`<div class="mu">Noch keine Pläne zugewiesen.</div>`;
  S.plans.forEach(p=>{const tgt=p.days.length||p.pw||1;let done=0;for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);if(planPct(p,iso(d))>0)done++}
   const pc=Math.min(100,Math.round(done/tgt*100));h+=`<div style="margin-top:8px"><b>${esc(p.name)}</b> <span class="chip" style="font-size:11px;padding:1px 6px">${getPlanLevel(p)}</span> <span class="mu">${done} von ${tgt} Einheiten · ${pc}%</span><div class="bar"><i style="width:${pc}%"></i></div></div>`});
  h+=`</div>`;
-
  const ds=Object.keys(S.log).sort().reverse();
  if(!ds.length)h+=`<div class="c mu">Sobald du Sets abhakst, erscheinen sie hier.</div>`;
  ds.forEach(d=>{const rows=S.plans.filter(p=>planPct(p,d)>0);if(!rows.length)return;
   h+=`<div class="c"><b>${new Date(d+"T12:00").toLocaleDateString("de-AT",{weekday:"short",day:"numeric",month:"short",year:"numeric"})}</b>`;
   rows.forEach(p=>{const pc=planPct(p,d);h+=`<div style="margin-top:6px">${esc(p.name)} <span class="chip" style="font-size:11px">${getPlanLevel(p)}</span> <span class="mu">${pc}%</span><div class="bar"><i style="width:${pc}%"></i></div></div>`});h+=`</div>`});
- return h}
-
-
+ return h;
+}

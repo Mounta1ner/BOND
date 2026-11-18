@@ -1399,6 +1399,7 @@
 
     return habitReminderHtml + impulseCardHtml;
   }
+  window.v3RenderHomeMindSlot = renderHomeMindCardsHtml;
 
   // --- 9. NAVIGATION & ÜBUNGSANSICHT IN „💪 BODY“ UND „🧠 MIND“ ---
   window.v3GoDomain = function (domain) {
@@ -1701,49 +1702,16 @@
       actionRow.appendChild(drillBtn);
     });
 
-    // 2. Zusatz-Kacheln auf Home einhängen (Gewohnheits-Anker & Tages-Reflexionsimpuls) – steuerbar über S.homeVisible & S.homeOrder
+    // 2. Fallback falls mindImpulse noch nicht über den nativen app.js Slot gerendert wurde
     const showMindImpulse = S.homeVisible?.mindImpulse !== false && S.ui?.homeVisible?.mindImpulse !== false;
-    if (showMindImpulse) {
-      const order = Array.isArray(S.homeOrder) ? S.homeOrder : [];
-      const dst = order.indexOf('mindImpulse');
+    if (showMindImpulse && !tpl.content.querySelector('section[data-module="mindImpulse"]')) {
       const mindSec = document.createElement('section');
       mindSec.className = 'home-module home-section';
       mindSec.setAttribute('data-module', 'mindImpulse');
       mindSec.innerHTML = renderHomeMindCardsHtml();
-
-      const nodes = [...tpl.content.children];
-      const before = dst >= 0 ? nodes.find(x => x.dataset?.module && order.indexOf(x.dataset.module) > dst) : null;
-      if (before) {
-        before.before(mindSec);
-      } else {
-        const planSec = tpl.content.querySelector('section[data-module="plans"]');
-        const extras = tpl.content.querySelector('.home-extras');
-        if (planSec && dst <= order.indexOf('plans') + 1) planSec.after(mindSec);
-        else if (extras) extras.before(mindSec);
-        else tpl.content.appendChild(mindSec);
-      }
-    }
-
-    // Alle [data-module] Sektionen auf Home strikt nach S.homeOrder sortieren und Ausgeblendete entfernen
-    const order = Array.isArray(S.homeOrder) ? S.homeOrder : [];
-    const modSections = [...tpl.content.querySelectorAll(':scope > [data-module]')];
-    if (modSections.length > 1 && order.length > 0) {
-      modSections.forEach(sec => {
-        const k = sec.getAttribute('data-module');
-        if (S.homeVisible && S.homeVisible[k] === false) sec.remove();
-      });
-      const remaining = [...tpl.content.querySelectorAll(':scope > [data-module]')];
-      remaining.sort((a, b) => {
-        const ia = order.indexOf(a.getAttribute('data-module'));
-        const ib = order.indexOf(b.getAttribute('data-module'));
-        return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
-      });
-      const firstRef = tpl.content.firstElementChild;
-      remaining.forEach(sec => {
-        const extras = tpl.content.querySelector(':scope > .home-extras');
-        if (extras) extras.before(sec);
-        else tpl.content.appendChild(sec);
-      });
+      const planSec = tpl.content.querySelector('section[data-module="plans"]');
+      if (planSec) planSec.after(mindSec);
+      else tpl.content.prepend(mindSec);
     }
 
     return tpl.innerHTML;

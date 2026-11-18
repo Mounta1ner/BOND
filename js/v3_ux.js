@@ -843,6 +843,4 @@
 
     return tpl.innerHTML;
   };
-
-  render();
 })();

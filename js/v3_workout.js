@@ -906,6 +906,4 @@
 
     return tpl.innerHTML;
   };
-
-  render();
 })();

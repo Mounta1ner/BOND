@@ -713,6 +713,4 @@
     } catch (_) {}
     _prevDoImpH();
   };
-
-  render();
 })();

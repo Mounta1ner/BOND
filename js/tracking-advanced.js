@@ -528,29 +528,7 @@ vSet = function () {
   return _vSetAdvanced() + financeSettings();
 };
 
-const _vTodayAdvanced = vToday;
-vToday = function () {
-  const body = _vTodayAdvanced();
-  const finances = financeHome();
-  if (!finances) return body;
-  const order = S.homeOrder || [];
-  let chunks = document.createElement('template');
-  chunks.innerHTML = body;
-  let nodes = [...chunks.content.children];
-  let fin = document.createElement('section');
-  fin.dataset.module = 'finance';
-  fin.className = 'home-section';
-  fin.innerHTML = finances;
-  const dst = order.indexOf('finance');
-  let before = nodes.find(x => order.indexOf(x.dataset.module) > dst && x.dataset.module);
-  if (before) before.before(fin);
-  else {
-    const exNode = nodes.find(x => x.classList.contains('home-extras'));
-    if (exNode) exNode.before(fin);
-    else chunks.content.appendChild(fin);
-  }
-  return chunks.innerHTML;
-};
+// financeHome() is rendered directly in app.js Home slot
 
 function activityHistoryRows() {
   return [...S.activityEvents].sort((a, b) => b.at.localeCompare(a.at));
@@ -659,5 +637,3 @@ tickNext = function (date, id, i, max) {
   }
   if (tab === 'today') render();
 };
-
-render();

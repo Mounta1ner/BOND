@@ -360,6 +360,4 @@
 
     return tpl.innerHTML;
   };
-
-  render();
 })();
