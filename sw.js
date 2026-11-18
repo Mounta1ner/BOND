@@ -1,5 +1,5 @@
 /* Mein Training 3.0: versioned offline cache, network-first for app code and catalog data. */
-const CACHE = 'meintraining-v402';
+const CACHE = 'meintraining-v403';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './version.json',
   './css/style.css', './css/ios-v28.css',
