@@ -52,7 +52,7 @@ const oldHistory=vHist;
 vHist=function(){const s=dashboardStats();const baseSections=oldHistory();
  return `<h2>Dashboard</h2><h3>Geplante Aktivitäten</h3><div class="d282-stats">${statTile('🔥',s.run,'Tage Serie')}${statTile('🏆',s.best,'Beste Serie')}${statTile('⏭️',s.miss,'Ausgelassen')}</div><h3>Alle Aktivitäten und Übungen</h3><div class="d282-stats">${statTile('✅',s.total,'Absolviert gesamt')}${statTile('📅',s.lastMonth,'Letzte 30 Tage')}</div><p class="mu">💪 Zuletzt trainiert: ${lastTraining()}</p>${chart()}${baseSections}${activitiesCard()}`;};
 // nav() is rendered by v3_mind.js
-const oldFAQ=v27FAQ;v27FAQ=function(){return oldFAQ()+`<details><summary>Wie zählt das Dashboard?</summary><p>Serie: alle fälligen geplanten Pläne und Aktivitäten eines Tages müssen abgeschlossen sein. Ausgelassen: fällige Einheiten ohne Abschluss bis zum Ende des Tages. Absolviert: erfasste Übungssätze und Aktivitäten; die letzten 30 Tage verwenden denselben Zähler im Zeitraum. Wiederholungen nur bei tatsächlich gespeicherter Menge.</p></details>`};
+const oldFAQ=v27FAQ;v27FAQ=function(){return oldFAQ()+`<details><summary>${tr('faqHowDashboardCounts')}</summary><p>${tr('faqHowDashboardCountsDesc')}</p></details>`};
 // Favorite quick action: one completed session, no invented repetition count.
 window.d282Quick=id=>{const e=ex(id);if(!e)return;S.exerciseHistory.push({id,name:e.n,at:new Date().toISOString(),unit:'completion',reps:0,source:'favorite'});save();toast('✓ '+e.n+' erfasst');render()};
 window.d282Start=id=>{const e=ex(id);if(!e)return;if(e.br){brOpen(id);return;}S.ui.d282Current={id,kind:unit(e)==='Wdh.'?'reps':'seconds',count:0,elapsed:0,running:false};d282CounterView();};
@@ -106,13 +106,13 @@ vSet=function(){
  const homeRows=(S.homeOrder||[]).map((k,i)=>`<div class="settingsRow"><label style="flex:1"><input type="checkbox" ${S.homeVisible?.[k]===false?'':'checked'} onchange="S.homeVisible['${k}']=this.checked;save();render()"> ${homeLabels[k]||esc(k)}</label><button class="chip" onclick="moveHome(${i},-1)">↑</button><button class="chip" onclick="moveHome(${i},1)">↓</button></div>`).join('');
  const historyRows=d282HistoryOrder().map((k,i)=>`<div class="settingsRow"><label style="flex:1"><input type="checkbox" ${S.ui.historyVisible?.[k]===false?'':'checked'} onchange="d282ToggleHistory('${k}',this.checked)"> ${d282SectionLabels[k]}</label><button class="chip" onclick="d282MoveHistory(${i},-1)">↑</button><button class="chip" onclick="d282MoveHistory(${i},1)">↓</button></div>`).join('');
  const result=[
- d282SettingsCard(v27s('Darstellung & Sprache','Appearance & language'),body(appearance), 'appearance',false),
- d282SettingsCard(v27s('Home Reihung und Anzeige konfigurieren','Configure Home order and visibility'),homeRows,'home',true),
- d282SettingsCard(v27s('Verlauf Reihung und Anzeige konfigurieren','Configure history order and visibility'),historyRows,'history',true),
+ d282SettingsCard(tr('appearanceAndLang'),body(appearance), 'appearance',false),
+ d282SettingsCard(tr('ui_251'),homeRows,'home',true),
+ d282SettingsCard(tr('ui_252'),historyRows,'history',true),
  d282SettingsCard('FAQ',body(faq),'faq',true),
  d282SettingsCard('⚡ Make me feel it',body(finance),'finance',true),
  notify?.outerHTML||'',calendar?.outerHTML||'',plans?.outerHTML||'',historyBackup?.outerHTML||'',
- d282SettingsCard(v27s('Gewicht eingeben – für BMI Berechnung','Enter weight – for BMI calculation'),body(personal)+(weightEntry?weightEntry.innerHTML:''),'weight',false),
+ d282SettingsCard(tr('ui_274'),body(personal)+(weightEntry?weightEntry.innerHTML:''),'weight',false),
  training?.outerHTML||'',widgets?.outerHTML||'',privacy?.outerHTML||''
  ];
  // Do not discard unknown future settings, but never reinsert duplicate order panels.
@@ -149,20 +149,20 @@ vHist=function(){
  return (groups._title||[]).join('')+order.filter(k=>visible[k]!==false).map(k=>(groups[k]||[]).join('')).join('')+Object.keys(groups).filter(k=>k!=='_title'&&!order.includes(k)).map(k=>groups[k].join('')).join('');
 };
 const d282FaqBefore=v27FAQ;
-v27FAQ=function(){return d282FaqBefore()+`<details><summary>${v27s('Was kann die App alles?','What can the app do?')}</summary><ul>${[
- v27s('Trainingspläne erstellen, bearbeiten, importieren und absolvieren','Create, edit, import and complete workout plans'),
- v27s('Übungen suchen, filtern und als Favoriten speichern','Find, filter and favorite exercises'),
- v27s('Wiederholungen und Trainingszeiten erfassen','Track repetitions and workout time'),
- v27s('Aktivitäten und Routinen mit Wochenzielen oder Wochentagen verwalten','Manage activities and routines with weekly goals or fixed days'),
- v27s('Aktivitäten positiv, negativ oder neutral bewerten','Classify activities as positive, negative or neutral'),
- v27s('Dashboard, Verlauf, Zeitstempel und Statistiken anzeigen','View dashboard, history, timestamps and statistics'),
- v27s('Gewicht und BMI-Verlauf dokumentieren','Track weight and BMI history'),
- v27s('Atemübungen, Pausentimer und BPM-Metronom verwenden','Use breathing exercises, rest timer and BPM metronome'),
- v27s('Liegestütz-Challenge, Streaks und Meilensteine verfolgen','Track push-up challenge, streaks and milestones'),
- v27s('Make me feel it mit optionaler finanzieller Bewertung verwenden','Use optional Make me feel it financial tracking'),
- v27s('Home und Dashboard individuell anordnen','Customize Home and Dashboard order'),
- v27s('Farbschema, Hell-/Dunkelmodus und Sprache einstellen','Set colors, light/dark mode and language'),
- v27s('Daten exportieren und sichern','Export and back up data'),
- v27s('Android-Widgets und lokale Erinnerungen verwenden (Android)','Use Android widgets and local reminders (Android)')
+v27FAQ=function(){return d282FaqBefore()+`<details><summary>${tr('faqWhatCanAppDo')}</summary><ul>${[
+ tr('faqCap1'),
+ tr('faqCap2'),
+ tr('faqCap3'),
+ tr('faqCap4'),
+ tr('faqCap5'),
+ tr('faqCap6'),
+ tr('faqCap7'),
+ tr('faqCap8'),
+ tr('faqCap9'),
+ tr('faqCap10'),
+ tr('faqCap11'),
+ tr('faqCap12'),
+ tr('faqCap13'),
+ tr('faqCap14')
 ].map(t=>`<li>${esc(t)}</li>`).join('')}</ul></details>`;};
 })();

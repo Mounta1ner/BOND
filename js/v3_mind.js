@@ -1869,324 +1869,8 @@
 
 
   // =========================================================================
-  // 12. VOLLSTÄNDIGE DE / EN ÜBERSETZUNGS-ENGINE (INKL. DYNAMISCHER MUSTER, MODALS & PLACEHOLDER)
+  // 12. ZENTRALE DE / EN ÜBERSETZUNGS-ENGINE (AUS data/translations.json)
   // =========================================================================
-  const V3_STATIC_MAP = {
-    'Home': 'Home',
-    'Pläne': 'Plans',
-    'Übungen': 'Exercises',
-    'Verlauf': 'History',
-    'Dashboard': 'Dashboard',
-    'Einstellungen': 'Settings',
-    'Meine Pläne': 'My plans',
-    '+ Neuer Plan': '+ New plan',
-    'Neuer Plan': 'New plan',
-    'Plan bearbeiten': 'Edit plan',
-    'Plan importieren': 'Import plan',
-    'Plan teilen': 'Share plan',
-    'Pläne exportieren': 'Export plans',
-    'Pläne importieren': 'Import plans',
-    'Alle Pläne exportieren': 'Export all plans',
-    'Verlauf exportieren': 'Export history',
-    'Verlauf importieren': 'Import history',
-    'Verlauf & Statistiken': 'History & statistics',
-    'Kuratierte Trainingspläne': 'Curated workout plans',
-    'Weitere Trainingspläne': 'More workout plans',
-    'Liegestütz-Trainingsplan': 'Push-up workout plan',
-    'Übernehmen': 'Adopt plan',
-    '+ Hinzufügen': '+ Add',
-    '+ Mental-Plan übernehmen': '+ Adopt mental plan',
-    '+ Diesen Gewohnheits-Plan starten': '+ Start this habit plan',
-    '+ Gewohnheits-Plan starten': '+ Start habit plan',
-    'Aktivitäten & Routinen': 'Activities & routines',
-    'Aktivitäten & Gewohnheiten Verlauf': 'Activities & habits history',
-    'Aktivitäten, Zeitstempel & Historie': 'Activities, timestamps & history',
-    'Aktivitäten': 'Activities',
-    'Aktivitäten anzeigen': 'Show activities',
-    'Geplante Aktivitäten': 'Scheduled activities',
-    'Alle Aktivitäten und Übungen': 'All activities and exercises',
-    'Noch keine Aktivitäten angelegt': 'No activities created yet',
-    'Noch keine Aktivitäten angelegt.': 'No activities created yet.',
-    'Noch keine Aktivitäten angelegt. Lege unter „Home“ Aktivitäten an.': 'No activities yet. Create activities on the Home tab.',
-    'Neue Aktivität erstellen': 'Create new activity',
-    'Aktivität speichern': 'Save activity',
-    'Keine Aktivitäten': 'No activities',
-    'Keine Pläne': 'No plans',
-    'Keine Einträge': 'No entries',
-    'Noch keine Einträge': 'No entries yet',
-    'Noch keine Einträge mit Zeitstempel.': 'No timestamped entries yet.',
-    'Noch keine Pläne zugewiesen': 'No plans assigned yet',
-    'Noch keine Pläne zugewiesen.': 'No plans assigned yet.',
-    'Noch keine eigenen Trainingspläne angelegt.': 'No custom workout plans created yet.',
-    'Wähle einen der vorbereiteten Standardpläne (z. B. Büro-Fit, Bauch-Beine-Po, Läufer) oder erstelle deinen eigenen Plan.': 'Choose one of the curated starter plans (e.g. Office Fit, Core & Legs, Runner) or create your own plan.',
-    'Zu den Plänen & Vorlagen': 'Go to plans & templates',
-    'Abhaken': 'Complete',
-    'Noch einmal': 'Again',
-    '✓ Noch einmal': '✓ Again',
-    'Auslassen': 'Skip',
-    'Erledigt': 'Completed',
-    '✓ Erledigt': '✓ Completed',
-    '✗ Ausgelassen': '✗ Skipped',
-    'Verpasst': 'Missed',
-    'Bearbeiten': 'Edit',
-    'Teilen': 'Share',
-    'Speichern': 'Save',
-    '✓ Speichern': '✓ Save',
-    'Abbrechen': 'Cancel',
-    'Löschen': 'Delete',
-    'Wirklich löschen': 'Confirm delete',
-    'Schließen': 'Close',
-    '✕ Schließen': '✕ Close',
-    'Fertig': 'Done',
-    'Zurück': 'Back',
-    '← Zurück': '← Back',
-    'Importieren': 'Import',
-    'Start': 'Start',
-    '▶ Start': '▶ Start',
-    '▶ Starten': '▶ Start',
-    'Stopp': 'Stop',
-    'Pause': 'Pause',
-    '⏸ Pause': '⏸ Pause',
-    '▶ Weiter': '▶ Resume',
-    'Beenden': 'End',
-    '+ Neu': '+ New',
-    'Neu': 'New',
-    'Kompakt ▼': 'Compact ▼',
-    'Alle ▲': 'All ▲',
-    'Stufe': 'Level',
-    'Stufe:': 'Level:',
-    'Leistungsstufe': 'Intensity level',
-    'Pause-Timer:': 'Rest timer:',
-    'Pausentimer': 'Rest timer',
-    'Diese Woche': 'This week',
-    'Wochentage': 'Weekdays',
-    'Wochentage:': 'Weekdays:',
-    'Feste Wochentage': 'Fixed weekdays',
-    'Mal pro Woche': 'Times per week',
-    '× pro Woche': '× per week',
-    'Ziel pro Woche': 'Weekly target',
-    'Jederzeit, beliebig oft': 'Any time, unlimited',
-    'Rhythmus': 'Rhythm',
-    'Rhythmus:': 'Rhythm:',
-    'Ton': 'Sound',
-    'BPM · Metronom': 'BPM · Metronome',
-    'BPM Metronom': 'BPM metronome',
-    'Gewicht': 'Weight',
-    'Gewicht (kg)': 'Weight (kg)',
-    'Gewicht erfassen': 'Track weight',
-    'Gewichtsverlauf': 'Weight history',
-    'Verlauf →': 'History →',
-    'Nach zwei Einträgen erscheint der Verlauf.': 'Chart appears after two entries.',
-    'Atemübungen nach Zweck': 'Breathing exercises by purpose',
-    'Atemübungen': 'Breathing exercises',
-    'Entspannen': 'Relax',
-    'Fokussieren': 'Focus',
-    'Runterkommen': 'Wind down',
-    'Meine Favoriten (Schnellstart)': 'My favorites (Quick start)',
-    'Favoriten:': 'Favorites:',
-    'Favoriten': 'Favorites',
-    'Tippe in der Übungsliste bei einer Übung auf „☆ Als Favorit“, um sie hier für den Schnellstart abzulegen.': 'Tap "☆ Add favorite" on any exercise in the library to pin it here for quick access.',
-    'Absolviere einzelne Übungen direkt per Fingertipp (Zeit/Wdh):': 'Complete individual exercises with a single tap (time/reps):',
-    '✓ Tracken': '✓ Track',
-    '☆ Als Favorit': '☆ Add favorite',
-    '★ Favorit': '★ Favorite',
-    '▶ Atemübung starten': '▶ Start breathing exercise',
-    '▶ Wiederholungen': '▶ Repetitions',
-    '▲ Beschreibung einklappen': '▲ Collapse description',
-    'Beschreibung einklappen': 'Collapse description',
-    'Start:': 'Start:',
-    'Übergang:': 'Transition:',
-    'Übergang': 'Transition',
-    'Ende:': 'End:',
-    'Ende': 'End',
-    'Ablauf': 'Flow',
-    'Bewegung': 'Motion',
-    'Genauere Anleitung:': 'Detailed instructions:',
-    'Gut bei / Ziel:': 'Good for / Goal:',
-    'Eher nicht machen bei:': 'Avoid if:',
-    'Eher nicht bei:': 'Avoid if:',
-    'Allgemeine Hinweise, sie ersetzen keine Anweisung deiner Therapeutin, deines Therapeuten oder deines Arztes.': 'General guidance only; does not replace advice from your physical therapist or physician.',
-    'Hier abspielen': 'Play here',
-    'Startet das Video nicht, öffne es über den Link.': 'If the video does not start, open it via the link.',
-    '▶ Videos auf YouTube suchen': '▶ Search videos on YouTube',
-    'Zu Plan hinzufügen': 'Add to plan',
-    '+ Eigene Übung': '+ Custom exercise',
-    '+ Eigene Body-Übung': '+ Custom body exercise',
-    '🗑 Eigene Übung löschen': '🗑 Delete custom exercise',
-    'Nichts gefunden.': 'Nothing found.',
-    'Alle': 'All',
-    'Kraft': 'Strength',
-    'Rumpf': 'Core',
-    'Gleichgewicht': 'Balance',
-    'Mobilisation': 'Mobility',
-    'Dehnung': 'Stretching',
-    'Schnelligkeit': 'Speed',
-    'Fitnessstudio': 'Gym',
-    'Atmen': 'Breathing',
-    'Eigene': 'Custom',
-    'Denkfehler': 'Cognitive biases',
-    'Alltags-Hürden': 'Everyday hurdles',
-    'Mentales Training': 'Mental training',
-    'Wissens-Module': 'Knowledge modules',
-    'Beruhigung': 'Calming',
-    'Konzentration': 'Concentration',
-    'Energie': 'Energy',
-    'Schlaf': 'Sleep',
-    'Ausdauer': 'Endurance',
-    'Krafttraining': 'Strength training',
-    'Körperregion:': 'Body region:',
-    'Alle Regionen': 'All regions',
-    'Nacken': 'Neck',
-    'Schulter': 'Shoulder',
-    'Arm/Hand': 'Arm/Hand',
-    'Rücken': 'Back',
-    'Rumpf/Bauch': 'Core/Abs',
-    'Hüfte/Gesäß': 'Hip/Glutes',
-    'Knie/Oberschenkel': 'Knee/Thigh',
-    'Wade/Fuß': 'Calf/Foot',
-    'Ganzkörper': 'Full body',
-    'Anfänger': 'Beginner',
-    'Amateur': 'Intermediate',
-    'Fortgeschritten': 'Advanced',
-    'Intensiv': 'Intense',
-    'Intensiv L2': 'Intense L2',
-    'Intensiv L3': 'Intense L3',
-    'Intensiv L4': 'Intense L4',
-    'Body · Trainingspläne': 'Body · Workout plans',
-    'Mind · Mental- & Gewohnheitspläne': 'Mind · Mental & habit plans',
-    'Body · Körper-Übungen': 'Body · Physical exercises',
-    'Mind · Mentales Training & Klarheit': 'Mind · Mental training & clarity',
-    'Situations-Quick-Check': 'Situation quick check',
-    'Quick-Check': 'Quick check',
-    'Einstiegs-Check starten': 'Start initial check',
-    'Dein Mind-Impuls heute': 'Your Mind impulse today',
-    'Notieren': 'Save note',
-    'Reflexionsfrage:': 'Reflection question:',
-    'Heute:': 'Today:',
-    'Deep-Dive & Quiz öffnen': 'Open deep dive & quiz',
-    'Drill': 'Drill',
-    'Drill starten': 'Start drill',
-    'Passenden Drill starten': 'Start matching drill',
-    'Situations-Drill': 'Situation drill',
-    'Interaktiver Situations-Coach': 'Interactive situation coach',
-    'Deine Situation eingeben ➔ Analyse & Umbau ➔ Leitsatz & Timer': 'Enter situation ➔ Analyze & reframe ➔ Guiding sentence & timer',
-    'Kompakte Impulse mit ausklappbarer Theorie, Alltagsbeispielen, Selbst-Check & Quiz.': 'Compact insights with expandable theory, everyday examples, self-check & quiz.',
-    'Alle Reflexionen bleiben zu 100 % privat und lokal auf deinem Gerät gespeichert.': 'All reflections stay 100% private and stored locally on your device.',
-    'Noch keine Einträge – starte oben einen Drill oder notiere deinen Tages-Impuls.': 'No entries yet – start a drill above or save your daily impulse.',
-    'Auslöser/Frage:': 'Trigger/Question:',
-    'Prüfung:': 'Check:',
-    'Prüfung': 'Check',
-    'Leitsatz / Notiz:': 'Guiding sentence / Note:',
-    'Impuls': 'Trigger',
-    'Ziel': 'Target',
-    'Quiz gelöst': 'Quiz solved',
-    'Tage Serie': 'Day streak',
-    'Serie laut Plan': 'Plan streak',
-    'Beste Serie': 'Best streak',
-    'Ausgelassen': 'Skipped',
-    'Absolviert gesamt': 'Total completed',
-    'Gesamt absolviert': 'Total completed',
-    'Letzte 30 Tage': 'Last 30 days',
-    'Im letzten Monat': 'In the last month',
-    'Verpasste Trainings': 'Missed workouts',
-    'Letzte 14 Tage': 'Last 14 days',
-    'Trainingsentwicklung · letzte 14 Tage': 'Training progress · last 14 days',
-    'Trainingsentwicklung': 'Training progress',
-    'Wiederholungen': 'Repetitions',
-    'Orange: Übungen · Grün: positiv · Rot: negativ · Blau: neutral. Tag antippen für Details.': 'Orange: exercises · Green: positive · Red: negative · Blue: neutral. Tap a day for details.',
-    'Absolvierte Einzelübungen': 'Completed single exercises',
-    'Make me feel it · Verlauf': 'Make me feel it · History',
-    'Noch offen': 'Still open',
-    'Aktuell offen:': 'Currently open:',
-    'Details →': 'Details →',
-    'Aktivieren': 'Enable',
-    'Positiv – bei Auslassen buchen': 'Positive – book when skipped/missed',
-    'Negativ – bei Erledigt buchen': 'Negative – book when completed',
-    'Neutral – keine Buchung': 'Neutral – no booking',
-    'Als beglichen zurücksetzen': 'Mark as settled (reset to 0 €)',
-    'CSV exportieren': 'Export CSV',
-    'Alle Einträge als CSV exportieren': 'Export all entries as CSV',
-    'Buchungen': 'Bookings',
-    'Zeit': 'Date',
-    'Quelle': 'Source',
-    'Grund': 'Reason',
-    'Betrag': 'Amount',
-    'Spenden-Vorschläge': 'Donation suggestions',
-    'Entwickler unterstützen: Marvin Berger': 'Support developer: Marvin Berger',
-    'IBAN kopieren': 'Copy IBAN',
-    'Die Links führen zur jeweiligen Spendenorganisation. Es wird keine Überweisung automatisch gestartet.': 'Links open the respective charity website. No transfer is initiated automatically.',
-    'Darstellung & Sprache': 'Appearance & language',
-    'Darstellung & Design': 'Appearance & design',
-    'Darstellung': 'Appearance',
-    'Auto': 'Auto',
-    'Hell': 'Light',
-    'Dunkel': 'Dark',
-    'Schwarz / Gold': 'Black / Gold',
-    'Schwarz/Gold': 'Black/Gold',
-    'Weiß/Orange': 'White/Orange',
-    'Farbschema': 'Color scheme',
-    'Sprache / Language': 'Language',
-    'Home Reihung und Anzeige konfigurieren': 'Configure Home order and visibility',
-    'Verlauf Reihung und Anzeige konfigurieren': 'Configure Dashboard order and visibility',
-    'Home konfigurieren': 'Configure Home',
-    'Trainingspläne': 'Workout plans',
-    'Mind-Impuls & Gewohnheits-Reminder': 'Mind impulse & habit reminder',
-    'Pause-Timer': 'Rest timer',
-    'Motivationsspruch': 'Motivational quote',
-    'Challenge': 'Challenge',
-    'Streaks': 'Streaks',
-    'Erfolge': 'Achievements',
-    'Einzelübungen': 'Single exercises',
-    'Weitere Bereiche': 'Other sections',
-    'Zuletzt trainiert': 'Last workout',
-    'Aktivitäts-Heatmap (26/52 Wochen)': 'Activity heatmap (26/52 weeks)',
-    'Kraft- & Leistungsverlauf': 'Strength & performance progress',
-    'Benachrichtigungen & Kalender-Erinnerung': 'Notifications & calendar reminder',
-    'Lokale App-Benachrichtigungen': 'Local app notifications',
-    'Kalender-Eintrag (.ics Export & Google Kalender)': 'Calendar entry (.ics export & Google Calendar)',
-    'Pläne & Verlauf sichern / exportieren': 'Back up & export plans / history',
-    'Trainingspläne duplizieren & als Bild / Druck-Tabelle exportieren': 'Duplicate workout plans & export as image / print table',
-    'Alle Pläne sichern & übertragen': 'Back up & transfer all plans',
-    'Trainingsverlauf sichern & importieren': 'Back up & import workout history',
-    'Duplizieren': 'Duplicate',
-    'Bild / Tabelle': 'Image / Table',
-    'Gewicht eingeben – für BMI Berechnung': 'Enter weight – for BMI calculation',
-    'Persönliche Daten': 'Personal data',
-    'Körpergröße (cm)': 'Body height (cm)',
-    'Wird für die BMI-Berechnung im Gewichtsverlauf verwendet.': 'Used for BMI calculation in weight history.',
-    'Training, Pause-Timer & Challenge': 'Workout, rest timer & challenge',
-    'Serien-Schutz: Joker & Pausier-Modus': 'Streak protection: Jokers & pause mode',
-    'Pausier-Modus aktivieren (Krankheit / Urlaub / Verletzung)': 'Enable pause mode (illness / vacation / injury)',
-    'Pausiert bis (einschließlich)': 'Paused until (inclusive)',
-    'Pause-Zeitraum speichern': 'Save pause period',
-    'Aktivität nachbuchen': 'Backfill activity',
-    'Gestern nachbuchen': 'Backfill yesterday',
-    'Serie in Gefahr!': 'Streak at risk!',
-    'Serie geschützt 🛡️': 'Streak protected 🛡️',
-    'Pause jetzt beenden': 'End pause now',
-    'Übungskatalog & Online-Updates': 'Exercise catalog & online updates',
-    'Übungskatalog jetzt prüfen': 'Check exercise catalog now',
-    'Datenschutz & Impressum': 'Privacy & imprint',
-    'Wiederholungsübung': 'Repetition exercise',
-    'Halte-Übung (Statisch)': 'Hold exercise (Static)',
-    'Links / Rechts getrennt': 'Left / Right separate',
-    '30s Halte-Timer starten': 'Start 30s hold timer',
-    'Kästchen antippen für Tages-Details & Nachbuchen': 'Tap any square for day details & backfill'
-  };
-
-  const V3_PLACEHOLDER_MAP = {
-    'Suchen: Name, Beschwerde, #Hashtag oder Ziel (z. B. Squat, Knie, Rücken)': 'Search: name, issue, #hashtag or goal (e.g. squat, knee, back)',
-    'Suchen: Name, Beschwerde oder Ziel (z. B. Squat, Knie, Rücken, Balance)': 'Search: name, issue or goal (e.g. squat, knee, back, balance)',
-    'Suchen: Katastrophisieren, Nein sagen, Gespräch, 21 Uhr, #denkfehler...': 'Search: catastrophizing, saying no, conversation, 9pm, #bias...',
-    'Suchen (z. B. Squat, Plank, Brücke)': 'Search (e.g. squat, plank, bridge)',
-    'Kurzer Gedanke für dein Mental-Logbuch...': 'Short thought for your mental journal...',
-    'z. B. 2.5L Wasser trinken, 10 Min Physio, 7000 Schritte': 'e.g. Drink 2.5L water, 10 min physio, 7000 steps',
-    'z. B. Knie-Reha': 'e.g. Knee rehab',
-    'z. B. Erkältung, Urlaub': 'e.g. Cold, vacation',
-    'Code hier einfügen': 'Paste backup code here',
-    'Deine Gedanken / Gegenbeweise / nächster Schritt...': 'Your thoughts / counter-evidence / next step...'
-  };
-
   const DAY_DE_TO_EN = { 'Mo': 'Mon', 'Di': 'Tue', 'Mi': 'Wed', 'Do': 'Thu', 'Fr': 'Fri', 'Sa': 'Sat', 'So': 'Sun' };
 
   function translateDynamicPattern(str) {
@@ -2246,6 +1930,23 @@
   }
 
   let _i18nBusy = false;
+  let _cachedCatalogRef = null;
+  let _cachedRevMap = {};
+
+  function getCatalogReverseMap() {
+    const catTrans = window.FITNESS_CATALOG?.translations;
+    if (!catTrans || !catTrans.de || !catTrans.en) return {};
+    if (_cachedCatalogRef === catTrans) return _cachedRevMap;
+    const rev = {};
+    for (const [k, deVal] of Object.entries(catTrans.de)) {
+      if (typeof deVal === 'string' && typeof catTrans.en[k] === 'string') {
+        rev[deVal] = catTrans.en[k];
+      }
+    }
+    _cachedCatalogRef = catTrans;
+    _cachedRevMap = rev;
+    return rev;
+  }
 
   window.v3ApplyFullI18N = function (customRoot) {
     document.documentElement.lang = S.lang === 'en' ? 'en' : 'de';
@@ -2253,10 +1954,9 @@
     _i18nBusy = true;
 
     try {
-      const catTrans = window.FITNESS_CATALOG?.translations;
-      const revCatalog = (catTrans && catTrans.de && catTrans.en)
-        ? Object.fromEntries(Object.entries(catTrans.de).map(([k, v]) => [v, catTrans.en[k]]))
-        : {};
+      const catTrans = window.FITNESS_CATALOG?.translations || {};
+      const revCatalog = getCatalogReverseMap();
+      const phMap = catTrans.placeholders || {};
 
       const roots = customRoot
         ? [customRoot]
@@ -2269,28 +1969,27 @@
             document.getElementById('tmr')
           ].filter(Boolean);
 
-      // 1. Zuerst alle <option>-Werte absichern, damit select.value bei Übersetzung des Option-Textes niemals seinen internen Wert verliert!
+      // 1. <option>-Werte absichern + placeholder, title & aria-label aus data/translations.json übersetzen
       roots.forEach(rt => {
         rt.querySelectorAll?.('option').forEach(opt => {
           if (!opt.hasAttribute('value')) {
             opt.setAttribute('value', (opt.textContent || '').trim());
           }
         });
-        // Übersetze placeholder, title & aria-label
         rt.querySelectorAll?.('[placeholder],[title],[aria-label]').forEach(el => {
           ['placeholder', 'title', 'aria-label'].forEach(attr => {
             const val = el.getAttribute(attr);
             if (!val) return;
-            if (V3_PLACEHOLDER_MAP[val]) {
-              el.setAttribute(attr, V3_PLACEHOLDER_MAP[val]);
-            } else if (V3_STATIC_MAP[val]) {
-              el.setAttribute(attr, V3_STATIC_MAP[val]);
+            if (phMap[val]) {
+              el.setAttribute(attr, phMap[val]);
+            } else if (revCatalog[val]) {
+              el.setAttribute(attr, revCatalog[val]);
             }
           });
         });
       });
 
-      // 2. Alle Textknoten übersetzen (inkl. Emoji-Prefix-Erhaltung & dynamischer Muster)
+      // 2. Alle Textknoten über data/translations.json übersetzen (inkl. Emoji-Prefix & dynamischer Muster)
       const emojiPrefixRegex = /^([\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}✓✗★☆▲▼▶⏸⏹⏭️🔄📋📤📥📦📱📲🗓️🛡️🃏⏸️▶️⚡🧠💪🏠📈⚖️🥁🌬️🌿🎯🌙🔒🛠️🎨🏋️🦵🔥🖨️🖼️💬🔴🟠🟡🟢🏆⏳ℹ️📓📖🧭🪜☑️✅❌💡📌💼🔍🗣️⭐]+\s*)/u;
 
       roots.forEach(rt => {
@@ -2304,8 +2003,8 @@
           if (!raw || !raw.trim()) continue;
           const trimmed = raw.trim();
 
-          // A) Direkter Treffer in V3_STATIC_MAP oder translations.json
-          const direct = V3_STATIC_MAP[trimmed] || revCatalog[trimmed];
+          // A) Direkter Treffer in data/translations.json
+          const direct = revCatalog[trimmed];
           if (direct && direct !== trimmed) {
             node.nodeValue = raw.replace(trimmed, direct);
             continue;
@@ -2316,7 +2015,7 @@
           if (emMatch) {
             const prefix = emMatch[1];
             const rest = trimmed.slice(prefix.length).trim();
-            const mappedRest = V3_STATIC_MAP[rest] || revCatalog[rest];
+            const mappedRest = revCatalog[rest];
             if (mappedRest && mappedRest !== rest) {
               node.nodeValue = raw.replace(trimmed, prefix + mappedRest);
               continue;

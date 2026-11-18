@@ -112,18 +112,19 @@ vEdit = function () {
   return _edit().replace('</h2>', `</h2><p class="mu">Die Leistungsstufe ändert Sätze und Wdh./Dauer automatisch. Basiswerte sind hier editierbar.</p>`);
 };
 
-const I18N = window.FITNESS_CATALOG.translations;
 function tr(key, values = {}) {
-  let text = (I18N[S.lang] || I18N.de)[key] || I18N.de[key] || key;
-  return text.replace(/\{(\w+)\}/g, (_, k) => String(values[k] ?? ''));
+  const dict = window.FITNESS_CATALOG?.translations || { de: {}, en: {} };
+  const lang = S.lang === 'en' ? 'en' : 'de';
+  let text = (dict[lang] && dict[lang][key]) || (dict.de && dict.de[key]) || key;
+  return String(text).replace(/\{(\w+)\}/g, (_, k) => String(values[k] ?? ''));
 }
+window.tr = tr;
 function switchLanguage(code) { S.lang = code === 'en' ? 'en' : 'de'; save(); render(); }
 function applyI18N() {
+  document.documentElement.lang = S.lang === 'en' ? 'en' : 'de';
   if (typeof window.v3ApplyFullI18N === 'function') {
     window.v3ApplyFullI18N();
-    return;
   }
-  document.documentElement.lang = S.lang === 'en' ? 'en' : 'de';
 }
 
 const _render = render;
