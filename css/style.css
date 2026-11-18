@@ -52,6 +52,75 @@ a{color:var(--ac)}.fg{display:flex;align-items:center;justify-content:center;pos
 :root[data-palette="gold"][data-mode="dark"] .c,:root[data-palette="gold"][data-mode="dark"] .home-section{background:#000;border-color:#ad8434}
 @media(prefers-color-scheme:dark){:root[data-mode="auto"][data-palette="gold"]{--bg:#000;--card:#000;--bd:#98762c}:root[data-mode="auto"][data-palette="gold"] .c{background:#000!important;border:1px solid #94722a!important}}
 
+/* ==========================================================================
+   Design 4: Perlmutt (Hell & Schwarz/Perlmutt)
+   ========================================================================== */
+:root[data-palette="pearl"] {
+  --ac: #18181b;
+  --ac2: #ebe6dc;
+  --mc: #8a7f6d;
+}
+
+/* Helles Perlmutt */
+:root[data-mode="light"][data-palette="pearl"],
+:root[data-mode="auto"][data-palette="pearl"] {
+  --bg: #f5f2eb;
+  --card: #fcfbf8;
+  --tx: #141414;
+  --mu: #68645e;
+  --bd: #dcd6ca;
+  --ac: #18181b;
+  --ac2: #eae5da;
+  --ok: #2e7d32;
+  --bb: #8c867c;
+  --mc: #7c7262;
+  color-scheme: light;
+}
+
+/* Dunkles Schwarz / Perlmutt (OLED) */
+:root[data-mode="dark"][data-palette="pearl"] {
+  --bg: #000000;
+  --card: #0a0a0a;
+  --tx: #f4f1ea;
+  --mu: #a8a298;
+  --bd: #4a463f;
+  --ac: #efece6;
+  --ac2: #1f1e1b;
+  --ok: #66bb6a;
+  --bb: #78736a;
+  --mc: #d6cfc2;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-mode="auto"][data-palette="pearl"] {
+    --bg: #000000;
+    --card: #0a0a0a;
+    --tx: #f4f1ea;
+    --mu: #a8a298;
+    --bd: #4a463f;
+    --ac: #efece6;
+    --ac2: #1f1e1b;
+    --ok: #66bb6a;
+    --bb: #78736a;
+    --mc: #d6cfc2;
+    color-scheme: dark;
+  }
+}
+
+/* Feine Perlmutt-Rahmen im dunklen Modus */
+:root[data-palette="pearl"][data-mode="dark"] .c,
+:root[data-palette="pearl"][data-mode="dark"] .v3-set-editor,
+:root[data-palette="pearl"][data-mode="dark"] .v3-phase-card,
+:root[data-palette="pearl"][data-mode="dark"] .v3-rpe-btn,
+:root[data-palette="pearl"][data-mode="dark"] .v3-admin-box,
+:root[data-palette="pearl"][data-mode="dark"] .v3-mind-step-card {
+  background: #050505 !important;
+  border: 1px solid #4a463f !important;
+}
+
+
+
 /* v2.5 responsive compressor / bigger touch targets */
 .bpm-layout{display:grid;grid-template-columns:minmax(0,1fr) 116px;gap:8px;align-items:center}
 .bpm-card #beatCircle{width:94px;height:94px;font-size:21px;margin:0 auto}
