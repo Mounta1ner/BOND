@@ -1270,16 +1270,25 @@
     const latestEval = S.mindState.evaluations[0];
     const driverInfo = DB.STRESS_DRIVER_INFO || {};
     const dayIndex = Math.floor(Date.now() / 86400000) + (Number(S.mindState.impulseOffset) || 0);
+    const mod = modules.length ? modules[Math.abs(dayIndex) % modules.length] : null;
 
-    let permissionThought = 'Ich darf gute 80 % leisten, klare Grenzen setzen und im Hier und Jetzt handeln.';
+    const fallbackQuotes = [
+      'Ich darf gute 80 % leisten, klare Grenzen setzen und im Hier und Jetzt handeln.',
+      'Zwischen Reiz und Reaktion liegt mein Freiraum zu wählen.',
+      'Fortschritt in Graustufen schlägt Perfektionismus jedes Mal.'
+    ];
+
     let driverName = '';
-    if (latestEval && latestEval.dominantDrivers?.[0] && driverInfo[latestEval.dominantDrivers[0]]) {
-      const topDriver = driverInfo[latestEval.dominantDrivers[0]];
-      driverName = topDriver.name;
-      permissionThought = topDriver.permissionThought;
+    let permissionThought = mod?.compactCard?.takeawayQuote || fallbackQuotes[Math.abs(dayIndex) % fallbackQuotes.length];
+
+    // Wenn ein Antreiber-Check vorliegt, streuen wir bei jedem 3. Impuls den passenden Erlaubnissatz ein
+    const domDrivers = (latestEval?.dominantDrivers || []).filter(k => driverInfo[k]);
+    if (domDrivers.length && Math.abs(dayIndex) % 3 === 0) {
+      const dKey = domDrivers[Math.floor(Math.abs(dayIndex) / 3) % domDrivers.length];
+      driverName = driverInfo[dKey].name;
+      permissionThought = driverInfo[dKey].permissionThought;
     }
 
-    const mod = modules.length ? modules[Math.abs(dayIndex) % modules.length] : null;
     return {
       driverName,
       permissionThought,

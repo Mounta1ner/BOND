@@ -8,7 +8,7 @@
   S.ui.settingsOpen = S.ui.settingsOpen || {};
 
   // Standard-Stehpose im 48x48 Koordinatensystem
-  const STD_STANDING_FIG = '24,7,24,13,24,27,24,36,24,44,24,20,24,27';
+  const STD_STANDING_FIG = '24,7,24,13,24,27,24,36,24,44,30,14,36,14';
   const STD_END_FIG = '26,15,23,21,15,32,28,33,25,44,29,20,34,20';
 
   const DEFAULT_UNILATERAL_IDS = new Set([
