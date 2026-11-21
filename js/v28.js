@@ -3,7 +3,7 @@
  'use strict';
  S.exerciseHistory=Array.isArray(S.exerciseHistory)?S.exerciseHistory:[];
  const previousApplyTheme=applyTheme;
- applyTheme=function(){previousApplyTheme();const palette=['petrol','gold','orange'].includes(S.palette)?S.palette:'petrol';
+ applyTheme=function(){previousApplyTheme();const palette=['petrol','gold','orange','pearl'].includes(S.palette)?S.palette:'petrol';
  const icon='./assets/icon-'+palette+'-32.png';
  const logo=document.getElementById('v28HeaderLogo');if(logo)logo.src='./assets/icon-'+palette+'-192.png';
  const favicon=document.querySelector('link[rel="icon"]');if(favicon)favicon.href=icon;
