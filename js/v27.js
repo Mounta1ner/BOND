@@ -33,9 +33,16 @@ const v27s=(de,en)=>S.lang==='en'?en:de;
 function v27Text(k){return tr(k)}
 function v27Save(){save();syncWidgets()}
 function v27Clip(html){const t=document.createElement('template');t.innerHTML=html;return t}
-function v27HomeParts(){ // Extract old rendered blocks with a real browser parser.
- const t=v27Clip(_today());const chunks={plans:[],activities:[],favorites:[],pause:[],quote:[]};let context='plans';
+const v27OriginalToday=typeof vToday==='function'?vToday:()=>'';
+function v27HomeParts(){ // Extract rendered blocks cleanly via data-module or fallback parser.
+ const t=v27Clip(v27OriginalToday());const chunks={plans:[],mindImpulse:[],activities:[],favorites:[],pause:[],quote:[]};let context='plans';
  for(const child of [...t.content.children]){
+  const mod=child.getAttribute?.('data-module');
+  if(mod && Object.prototype.hasOwnProperty.call(chunks,mod)){
+   chunks[mod].push(child.innerHTML);
+   continue;
+  }
+  if(child.classList?.contains('home-extras'))continue;
   const title=(child.querySelector('h3')?.textContent||'').toLowerCase(),body=child.textContent||'';
   if(child.tagName==='H2'&&body.trim().startsWith('Home'))continue;
   if(child.classList.contains('sc')&&body.includes('Pause-Timer'))context='pause';
@@ -44,7 +51,6 @@ function v27HomeParts(){ // Extract old rendered blocks with a real browser pars
   else if(child.classList.contains('c')&&/text-align:\s*center/.test(child.getAttribute('style')||'')&&(!title||title.includes('spruch')))context='quote';
   else if(context==='pause')context='plans';
   chunks[context].push(child.outerHTML);
-  // No bleed from activities to the subsequent entries.
   if(context==='activities')context='plans';
  }
  return Object.fromEntries(Object.entries(chunks).map(([k,v])=>[k,v.join('')]));
@@ -66,7 +72,7 @@ function v27Streak(p){let streak=0;const now=new Date();now.setHours(12,0,0,0);c
 function v27ChallengeGoal(){const c=S.v27.challenge;if(!c)return 0;return Math.min(c.goal,Math.max([5,10,15][c.level]||5,((c.best||0)+[2,4,6][c.level])))}
 function v27ChallengeCard(){const c=S.v27.challenge;if(!c)return '';
  const p=Math.min(100,Math.round(100*(c.best||0)/c.goal));return `<div class="c"><h3>💪 ${v27s('Liegestütz-Challenge','Push-up challenge')}</h3><div class="r"><b>${c.best||0} / ${c.goal}</b><span class="mu">${p}%</span></div><div class="bar"><i style="width:${p}%"></i></div><p class="mu">${v27s('Nächste Einheit','Next session')}: <b>${v27ChallengeGoal()}</b> · ${v27s('Persönlicher Rekord','Personal best')}: <b>${c.best||0}</b></p><button class="b" onclick="v27Counter()">▶ ${v27s('Challenge starten','Start challenge')}</button> <button class="chip" onclick="v27ConfigureChallenge()">✎</button> <button class="chip" onclick="v27DeleteChallenge()">✕</button></div>`}
-function v27Home(){const blocks=v27HomeParts();const cards={...blocks,weight:weightQuick(),bpm:bpmCard(),breath:breathHint(),streak:v27BadgeCard(),challenge:v27ChallengeCard(),finance:financeHome()};
+function v27Home(){const blocks=v27HomeParts();const cards={...blocks,mindImpulse:typeof window.v3RenderHomeMindSlot==='function'?window.v3RenderHomeMindSlot():(blocks.mindImpulse||''),weight:weightQuick(),bpm:bpmCard(),breath:breathHint(),streak:v27BadgeCard(),challenge:v27ChallengeCard(),finance:typeof financeHome==='function'?financeHome():''};
  // Use original helper for favorite content, independent from plan/activities.
  cards.favorites=(S.fav||[]).length?favHtml():'';cards.quote=quoteHtml();
  cards.pause=`<div class="c"><h3>⏳ ${v27Text('pause')}</h3><div class="r">${[30,60,90].map(n=>`<button class="chip" onclick="tmStart(${n},'Pause')">${n}s</button>`).join('')}</div></div>`;
@@ -159,7 +165,7 @@ vHist=function(){const old=v27OriginalHistory();const weights=`<div class="c"><h
 const v27Plans=vPlans;
 vPlans=function(){return v27Plans()+`<div class="c"><h3>💪 Liegestütz-Challenge</h3><button class="b g" onclick="v27ConfigureChallenge()">${v27s('Ziel festlegen','Set target')}</button></div>`};
 const v27RenderFinal=render;
-render=function(){v27RenderFinal();document.title='Mein Training';if(tab==='set')document.querySelectorAll('#app details').forEach(x=>x.classList.add('v27Details'))};
+render=function(){v27RenderFinal();document.title='BOND';if(tab==='set')document.querySelectorAll('#app details').forEach(x=>x.classList.add('v27Details'))};
 // Native widget queue consumes actual events. Existing legacy event map remains valid.
 function v27WidgetSync(){try{window.AndroidBridge?.sync?.(JSON.stringify({habits:S.habits,plans:S.plans,palette:S.palette,theme:S.mode}))}catch(e){}}
 const v27SavedSync=syncWidgets;

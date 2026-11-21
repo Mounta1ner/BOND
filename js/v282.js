@@ -102,7 +102,7 @@ vSet=function(){
  const weightWidget=document.createElement('template');weightWidget.innerHTML=weightQuick();
  const weightEntry=weightWidget.content.querySelector('.c');
  // Exactly one Home controller: reuse existing saved order, visibility and moveHome.
- const homeLabels={plans:'Trainingspläne',activities:'Aktivitäten & Routinen',favorites:'Favoriten',pause:'Pause-Timer',quote:'Motivationsspruch',weight:'Gewicht',bpm:'BPM',breath:'Atemübungen',challenge:'Challenge',streak:'Streaks',finance:'Make me feel it'};
+ const homeLabels={plans:'Trainingspläne',mindImpulse:'Mind-Impuls & Gewohnheits-Reminder',activities:'Aktivitäten & Routinen',favorites:'Favoriten',pause:'Pause-Timer',quote:'Motivationsspruch',weight:'Gewicht',bpm:'BPM',breath:'Atemübungen',challenge:'Challenge',streak:'Streaks',finance:'Make me feel it'};
  const homeRows=(S.homeOrder||[]).map((k,i)=>`<div class="settingsRow"><label style="flex:1"><input type="checkbox" ${S.homeVisible?.[k]===false?'':'checked'} onchange="S.homeVisible['${k}']=this.checked;save();render()"> ${homeLabels[k]||esc(k)}</label><button class="chip" onclick="moveHome(${i},-1)">↑</button><button class="chip" onclick="moveHome(${i},1)">↓</button></div>`).join('');
  const historyRows=d282HistoryOrder().map((k,i)=>`<div class="settingsRow"><label style="flex:1"><input type="checkbox" ${S.ui.historyVisible?.[k]===false?'':'checked'} onchange="d282ToggleHistory('${k}',this.checked)"> ${d282SectionLabels[k]}</label><button class="chip" onclick="d282MoveHistory(${i},-1)">↑</button><button class="chip" onclick="d282MoveHistory(${i},1)">↓</button></div>`).join('');
  const result=[
