@@ -422,9 +422,11 @@
     return MIND_CATEGORIES.includes(e.c) || id.startsWith('m') || id.startsWith('drill_') || e.domain === 'mind';
   };
 
+  // In Mind nur die relevanteste Atemübung je Kategorie (Beruhigung, Konzentration, Energie, Schlaf); alle bleiben unter Body -> Atmen
+  const MIND_FEATURED_BREATH_IDS = new Set(['e123', 'e127', 'e129', 'e125']);
   window.v3IsMindOrBreath = function (e) {
     if (!e) return false;
-    return window.v3IsMindExercise(e) || e.c === 'Atmen';
+    return window.v3IsMindExercise(e) || (e.c === 'Atmen' && MIND_FEATURED_BREATH_IDS.has(e.id));
   };
 
   // --- 3. SVG-GRAFIKEN FÜR MIND-ÜBUNGEN ---
