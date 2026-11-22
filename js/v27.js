@@ -38,8 +38,8 @@ function v27HomeParts(){ // Extract rendered blocks cleanly via data-module or f
  const t=v27Clip(v27OriginalToday());const chunks={plans:[],mindImpulse:[],activities:[],favorites:[],pause:[],quote:[]};let context='plans';
  for(const child of [...t.content.children]){
   const mod=child.getAttribute?.('data-module');
-  if(mod && Object.prototype.hasOwnProperty.call(chunks,mod)){
-   chunks[mod].push(child.innerHTML);
+  if(mod){
+   if(Object.prototype.hasOwnProperty.call(chunks,mod)) chunks[mod].push(child.innerHTML);
    continue;
   }
   if(child.classList?.contains('home-extras'))continue;
